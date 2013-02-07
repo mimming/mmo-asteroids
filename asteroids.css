@@ -1,0 +1,129 @@
+body {
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: url('bg_tile.jpg');
+  margin-left: auto;
+  margin-right: auto;
+  width: 1024px;
+  font-size: 16px;
+  color: #c0c0c0;
+}
+
+h1 {
+  font-size: 36px;
+  text-align: left;
+  font-weight: bold;
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #c0c0c0;
+}
+
+h3 {
+  font-size: 24px;
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #c0c0c0;
+}
+
+span {
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #c0c0c0;
+}
+
+A:link {text-decoration: none; color: yellow}
+A:visited {text-decoration: none; color: yellow}
+A:active {text-decoration: none; color: yellow}
+A:hover {text-decoration: underline; color: white;}
+
+#asteroids {
+  width: 100%;
+}
+
+#game-container {
+  width: 100%;
+}
+
+#header-pane {
+}
+
+#header-left {
+  float: left;
+}
+
+#footer-col {
+  float: left;
+  width: 33%;
+}
+
+#header-right {
+  float: right;
+}
+
+#footer-pane {
+  width:100%;
+}
+
+
+.middle {
+  display:inline-block;
+  vertical-align:middle;
+}
+
+#game-pane {
+}
+
+#leaderboardTable {
+  overflow: auto;
+  width: 100%;
+  color: #c0c0c0;
+}
+
+#canvas {
+  position:relative;
+  border: 8px solid #424547;
+  margin: 2px;
+  color: #424547;
+  background: url('stars.gif');
+}
+
+.button {
+  position:absolute;
+  border:1px solid black;
+}
+
+#left-controls {
+  position:absolute;
+  left:1px;
+  bottom:0px;
+  display:none;
+}
+
+#right-controls {
+  position:absolute;
+  right:1px;
+  bottom:0px;
+  display:none;
+}
+
+#up {
+  width:200px;
+  height:100px;
+  bottom:100px;
+}
+
+#left {
+  width:100px;
+  height:100px;
+  bottom:0px;
+}
+
+#right {
+  width:100px;
+  height:100px;
+  bottom:0px;
+  left:100px;
+}
+
+#space {
+  width:200px;
+  height:200px;
+  bottom:0px;
+  right:0px;
+}

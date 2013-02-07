@@ -1,7 +1,26 @@
-// Canvas Asteroids
-//
-// Copyright (c) 2010 Doug McInnes
-//
+/*
+
+   Copyright (c) 2010 Doug McInnes
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN      
+   THE SOFTWARE.
+
+*/
 
 KEY_CODES = {
   32: 'space',
@@ -9,17 +28,17 @@ KEY_CODES = {
   38: 'up',
   39: 'right',
   40: 'down',
-  70: 'f',
   71: 'g',
   72: 'h',
   77: 'm',
-  80: 'p'
 }
 
 KEY_STATUS = { keyDown:false };
 for (code in KEY_CODES) {
   KEY_STATUS[KEY_CODES[code]] = false;
 }
+
+var chatting = false;
 
 $(window).keydown(function (e) {
   KEY_STATUS.keyDown = true;
@@ -36,6 +55,113 @@ $(window).keydown(function (e) {
 });
 
 GRID_SIZE = 60;
+
+var frefR = 'https://mmoasteroids.firebaseio.com/';
+var frefA = frefR + 'game';
+var frefL = frefR + 'leaderboard';
+
+// Firebase.enableLogging(true);
+var asteroids = new Firebase(frefA);
+var myship = asteroids.child('players').push();
+myship.removeOnDisconnect();
+
+// Leaderboard start
+var LEADERBOARD_SIZE = 25;
+// Should the leaderboard be global? Move it to delta?
+var leaderboard = new Firebase(frefL);
+var scoreListRef = leaderboard.child('scoreList');
+var htmlForPath = {};
+var currentUser = { name: "Guest" + Math.floor((10000 * Math.random())), type: 'guest', photo: null };
+
+function updateName() {
+ if(currentUser.type == 'twitter') {
+   $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
+ }
+ else {
+   $('#my-name').text(currentUser.name);
+ }
+}
+
+updateName();
+
+/*twttr.anywhere(function (T) {
+  if(T.isConnected()) {
+    currentUser = { name: T.currentUser.data('screen_name'), type: 'twitter', photo: T.currentUser.data('profile_image_url') };
+    $('#login').remove();
+  }
+  updateName();
+
+  T.bind("authComplete", function (e, user) {
+    currentUser = { name: user.data('screen_name'), type: 'twitter', photo: user.data('profile_image_url') };
+    $('#login').remove();
+    updateName();
+  });
+});*/
+				    
+function handleScoreAdded(scoreSnapshot, lowerScoreName) {
+	var newScoreRow = $("<tr/>");
+	var postedScore = scoreSnapshot.val();
+	if(postedScore.user.type == 'twitter') {
+	  newScoreRow.append($("<td/>").append('<img height=24 src="' + postedScore.user.photo + '">').append($("<strong/>").text('@' + postedScore.user.name)));
+	  newScoreRow.append($("<td/>").text(postedScore.score));
+	}
+	else {
+	  newScoreRow.append($("<td/>").append($("<strong/>").text(postedScore.user.name)));
+	  newScoreRow.append($("<td/>").text(postedScore.score));
+	}
+
+	// Store a reference to the table row so we can get it again later.
+	htmlForPath[scoreSnapshot.name()] = newScoreRow;
+
+	// Insert the new score in the appropriate place in the GUI.
+	if (lowerScoreName === null) {
+		$("#leaderboardTable").append(newScoreRow);
+	}
+	else {
+		var lowerScoreRow = htmlForPath[lowerScoreName];
+		lowerScoreRow.before(newScoreRow);
+	}
+}
+
+function handleScoreRemoved(scoreSnapshot) {
+	var removedScoreRow = htmlForPath[scoreSnapshot.name()];
+	removedScoreRow.remove();
+	delete htmlForPath[scoreSnapshot.name()];
+}
+
+var scoreListView = scoreListRef.limit(LEADERBOARD_SIZE);
+
+scoreListView.on('child_added', function (newScoreSnapshot, prevScoreName) {
+		handleScoreAdded(newScoreSnapshot, prevScoreName);
+		});
+
+scoreListView.on('child_removed', function (oldScoreSnapshot) {
+		handleScoreRemoved(oldScoreSnapshot);
+		});
+
+var changedCallback = function (scoreSnapshot, prevScoreName) {
+	handleScoreRemoved(scoreSnapshot);
+	handleScoreAdded(scoreSnapshot, prevScoreName);
+};
+scoreListView.on('child_moved', changedCallback);
+scoreListView.on('child_changed', changedCallback);
+
+function setScore(score) {
+   Game.score = score;
+   updateScore();
+}
+
+function deltaScore(score) {
+   Game.score += score;
+   updateScore();
+}
+
+function updateScore() {
+     $("#my-score").html(Game.score);
+}
+
+// Leaderboard end
+
 
 Matrix = function (rows, columns) {
   var i, j;
@@ -111,6 +237,7 @@ Sprite = function () {
 
   this.preMove  = null;
   this.postMove = null;
+  this.strokeStyle = "#000000";
 
   this.run = function(delta) {
 
@@ -227,7 +354,7 @@ Sprite = function () {
   this.draw = function () {
     if (!this.visible) return;
 
-    this.context.lineWidth = 1.0 / this.scale;
+    this.context.lineWidth = 1.5 / this.scale;
 
     for (child in this.children) {
       this.children[child].draw();
@@ -243,6 +370,7 @@ Sprite = function () {
     }
 
     this.context.closePath();
+    this.context.strokeStyle = this.strokeStyle;
     this.context.stroke();
   };
   this.findCollisionCanidates = function () {
@@ -371,23 +499,29 @@ Ship = function () {
               0, -12,
               5,   4]);
 
+  this.scale = 1.5;
   this.children.exhaust = new Sprite();
+  this.children.exhaust.strokeStyle = "#ff0000";
   this.children.exhaust.init("exhaust",
                              [-3,  6,
                                0, 11,
                                3,  6]);
 
   this.bulletCounter = 0;
+  this.strokeStyle = "#ffff00";
+  this.keyFrame = 0;
 
   this.postMove = this.wrapPostMove;
 
-  this.collidesWith = ["asteroid", "bigalien", "alienbullet"];
+  this.collidesWith = ["enemybullet", "enemyship"];
+
+  this.previousKeyFrame = { vel: { rot: 0 }, accb: false };
 
   this.preMove = function (delta) {
     if (KEY_STATUS.left) {
-      this.vel.rot = -6;
+      this.vel.rot = -5;
     } else if (KEY_STATUS.right) {
-      this.vel.rot = 6;
+      this.vel.rot = 5;
     } else {
       this.vel.rot = 0;
     }
@@ -408,7 +542,7 @@ Ship = function () {
     }
     if (KEY_STATUS.space) {
       if (this.bulletCounter <= 0) {
-        this.bulletCounter = 10;
+        this.bulletCounter = 10; // XXX
         for (var i = 0; i < this.bullets.length; i++) {
           if (!this.bullets[i].visible) {
             SFX.laser();
@@ -422,6 +556,8 @@ Ship = function () {
             bullet.vel.x = 6 * vectorx + this.vel.x;
             bullet.vel.y = 6 * vectory + this.vel.y;
             bullet.visible = true;
+	    bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
+	    bullet.fref.removeOnDisconnect();
             break;
           }
         }
@@ -433,144 +569,118 @@ Ship = function () {
       this.vel.x *= 0.95;
       this.vel.y *= 0.95;
     }
+
+    if((this.vel.rot != this.previousKeyFrame.vel.rot) || (KEY_STATUS.up != this.previousKeyFrame.accb)) {
+      myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
+    }
+    this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: KEY_STATUS.up };
+
+    this.keyFrame++;
+    if(this.keyFrame % 60 == 0) {
+      myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
+    }
   };
 
   this.collision = function (other) {
     SFX.explosion();
-    Game.explosionAt(other.x, other.y);
+    if(other != null) {
+      Game.explosionAt(other.x, other.y);
+    }
+    else {
+      Game.explosionAt(Game.ship.x, Game.ship.y);
+    }
     Game.FSM.state = 'player_died';
     this.visible = false;
-    this.currentNode.leave(this);
+    if(this.currentNode != null) {
+      this.currentNode.leave(this);
+    }
     this.currentNode = null;
     Game.lives--;
+    if (other != null && other.name == "enemyship") deltaScore(Math.floor(100 * Math.random()));
   };
 
 };
 Ship.prototype = new Sprite();
 
-BigAlien = function () {
-  this.init("bigalien",
-            [-20,   0,
-             -12,  -4,
-              12,  -4,
-              20,   0,
-              12,   4,
-             -12,   4,
-             -20,   0,
-              20,   0]);
+EnemyShip = function () {
+  this.init("enemyship",
+            [-5,   4,
+              0, -12,
+              5,   4]);
 
-  this.children.top = new Sprite();
-  this.children.top.init("bigalien_top",
-                         [-8, -4,
-                          -6, -6,
-                           6, -6,
-                           8, -4]);
-  this.children.top.visible = true;
+  this.children.exhaust = new Sprite();
+  this.children.exhaust.strokeStyle = "#ff0000";
+  this.children.exhaust.init("exhaust",
+                             [-3,  6,
+                               0, 11,
+                               3,  6]);
 
-  this.children.bottom = new Sprite();
-  this.children.bottom.init("bigalien_top",
-                            [ 8, 4,
-                              6, 6,
-                             -6, 6,
-                             -8, 4]);
-  this.children.bottom.visible = true;
-
-  this.collidesWith = ["asteroid", "ship", "bullet"];
-
-  this.bridgesH = false;
-
-  this.bullets = [];
+  this.scale = 1.5;
   this.bulletCounter = 0;
+  this.strokeStyle = "#ffffff";
 
-  this.newPosition = function () {
-    if (Math.random() < 0.5) {
-      this.x = -20;
-      this.vel.x = 1.5;
-    } else {
-      this.x = Game.canvasWidth + 20;
-      this.vel.x = -1.5;
+  this.postMove = this.wrapPostMove;
+  this.collidesWith = ["bullet"];
+
+  this.draw = function () {
+    if (!this.visible) return;
+
+    this.context.lineWidth = 1.5 / this.scale;
+
+    for (child in this.children) {
+      this.children[child].draw();
     }
-    this.y = Math.random() * Game.canvasHeight;
-  };
 
-  this.setup = function () {
-    this.newPosition();
+    this.context.beginPath();
 
-    for (var i = 0; i < 3; i++) {
-      var bull = new AlienBullet();
-      this.bullets.push(bull);
-      Game.sprites.push(bull);
+    this.context.moveTo(this.points[0], this.points[1]);
+    for (var i = 1; i < this.points.length/2; i++) {
+      var xi = i*2;
+      var yi = xi + 1;
+      this.context.lineTo(this.points[xi], this.points[yi]);
     }
+
+    this.context.closePath();
+    this.context.strokeStyle = this.strokeStyle;
+    if(this.eimg != null) {
+     this.context.drawImage(this.eimg, 0, 0, 20, 20);
+    }
+    this.context.stroke();
   };
 
   this.preMove = function (delta) {
-    var cn = this.currentNode;
-    if (cn == null) return;
-
-    var topCount = 0;
-    if (cn.north.nextSprite) topCount++;
-    if (cn.north.east.nextSprite) topCount++;
-    if (cn.north.west.nextSprite) topCount++;
-
-    var bottomCount = 0;
-    if (cn.south.nextSprite) bottomCount++;
-    if (cn.south.east.nextSprite) bottomCount++;
-    if (cn.south.west.nextSprite) bottomCount++;
-
-    if (topCount > bottomCount) {
-      this.vel.y = 1;
-    } else if (topCount < bottomCount) {
-      this.vel.y = -1;
-    } else if (Math.random() < 0.01) {
-      this.vel.y = -this.vel.y;
+    // limit the ship's speed
+    if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > 8) {
+      this.vel.x *= 0.95;
+      this.vel.y *= 0.95;
     }
 
-    this.bulletCounter -= delta;
-    if (this.bulletCounter <= 0) {
-      this.bulletCounter = 22;
-      for (var i = 0; i < this.bullets.length; i++) {
-        if (!this.bullets[i].visible) {
-          bullet = this.bullets[i];
-          var rad = 2 * Math.PI * Math.random();
-          var vectorx = Math.cos(rad);
-          var vectory = Math.sin(rad);
-          bullet.x = this.x;
-          bullet.y = this.y;
-          bullet.vel.x = 6 * vectorx;
-          bullet.vel.y = 6 * vectory;
-          bullet.visible = true;
-          SFX.laser();
-          break;
-        }
-      }
+    if(this.accb) {
+      var rad = ((this.rot-90) * Math.PI)/180;
+      this.acc.x = 0.5 * Math.cos(rad);
+      this.acc.y = 0.5 * Math.sin(rad);
+       this.children.exhaust.visible = Math.random() > 0.1;
     }
-
+    else {
+       this.acc.x = 0;
+       this.acc.y = 0;
+       this.children.exhaust.visible = false;
+    }
   };
 
-  BigAlien.prototype.collision = function (other) {
-    if (other.name == "bullet") Game.score += 200;
+  this.collision = function (other) {
     SFX.explosion();
     Game.explosionAt(other.x, other.y);
+    this.fref.remove();
     this.visible = false;
-    this.newPosition();
+    this.currentNode.leave(this);
+    this.currentNode = null;
+    //Game.lives--;
   };
 
-  this.postMove = function () {
-    if (this.y > Game.canvasHeight) {
-      this.y = 0;
-    } else if (this.y < 0) {
-      this.y = Game.canvasHeight;
-    }
-
-    if ((this.vel.x > 0 && this.x > Game.canvasWidth + 20) ||
-        (this.vel.x < 0 && this.x < -20)) {
-      // why did the alien cross the road?
-      this.visible = false;
-      this.newPosition();
-    }
-  }
 };
-BigAlien.prototype = new Sprite();
+EnemyShip.prototype = new Sprite();
+
 
 Bullet = function () {
   this.init("bullet", [0, 0]);
@@ -578,9 +688,6 @@ Bullet = function () {
   this.bridgesH = false;
   this.bridgesV = false;
   this.postMove = this.wrapPostMove;
-  // asteroid can look for bullets so doesn't have
-  // to be other way around
-  //this.collidesWith = ["asteroid"];
 
   this.configureTransform = function () {};
   this.draw = function () {
@@ -592,6 +699,54 @@ Bullet = function () {
       this.context.lineTo(this.x+1, this.y+1);
       this.context.moveTo(this.x+1, this.y-1);
       this.context.lineTo(this.x-1, this.y+1);
+      this.context.strokeStyle = "#ffffff";
+      this.context.stroke();
+      this.context.restore();
+    }
+  };
+  this.preMove = function (delta) {
+    if (this.visible) {
+      this.time += delta;
+    }
+    if (this.time > 50) { // XXX
+      this.visible = false;
+      this.time = 0;
+      this.fref.remove();
+    }
+  };
+  this.collision = function (other) {
+    this.time = 0;
+    this.visible = false;
+    this.fref.remove();
+    this.currentNode.leave(this);
+    this.currentNode = null;
+    if (other.name == "enemyship") deltaScore(100);
+  };
+  this.transformedPoints = function (other) {
+    return [this.x, this.y];
+  };
+
+};
+Bullet.prototype = new Sprite();
+
+EnemyBullet = function () {
+  this.init("enemybullet", [0, 0]);
+  this.time = 0;
+  this.bridgesH = false;
+  this.bridgesV = false;
+  this.postMove = this.wrapPostMove;
+
+  this.configureTransform = function () {};
+  this.draw = function () {
+    if (this.visible) {
+      this.context.save();
+      this.context.lineWidth = 2;
+      this.context.beginPath();
+      this.context.moveTo(this.x-1, this.y-1);
+      this.context.lineTo(this.x+1, this.y+1);
+      this.context.moveTo(this.x+1, this.y-1);
+      this.context.lineTo(this.x-1, this.y+1);
+      this.context.strokeStyle = "#ff0000";
       this.context.stroke();
       this.context.restore();
     }
@@ -603,6 +758,7 @@ Bullet = function () {
     if (this.time > 50) {
       this.visible = false;
       this.time = 0;
+      this.fref.remove();
     }
   };
   this.collision = function (other) {
@@ -616,67 +772,7 @@ Bullet = function () {
   };
 
 };
-Bullet.prototype = new Sprite();
-
-AlienBullet = function () {
-  this.init("alienbullet");
-
-  this.draw = function () {
-    if (this.visible) {
-      this.context.save();
-      this.context.lineWidth = 2;
-      this.context.beginPath();
-      this.context.moveTo(this.x, this.y);
-      this.context.lineTo(this.x-this.vel.x, this.y-this.vel.y);
-      this.context.stroke();
-      this.context.restore();
-    }
-  };
-};
-AlienBullet.prototype = new Bullet();
-
-Asteroid = function () {
-  this.init("asteroid",
-            [-10,   0,
-              -5,   7,
-              -3,   4,
-               1,  10,
-               5,   4,
-              10,   0,
-               5,  -6,
-               2, -10,
-              -4, -10,
-              -4,  -5]);
-
-  this.visible = true;
-  this.scale = 6;
-  this.postMove = this.wrapPostMove;
-
-  this.collidesWith = ["ship", "bullet", "bigalien", "alienbullet"];
-
-  this.collision = function (other) {
-    SFX.explosion();
-    if (other.name == "bullet") Game.score += 120 / this.scale;
-    this.scale /= 3;
-    if (this.scale > 0.5) {
-      // break into fragments
-      for (var i = 0; i < 3; i++) {
-        var roid = $.extend(true, {}, this);
-        roid.vel.x = Math.random() * 6 - 3;
-        roid.vel.y = Math.random() * 6 - 3;
-        if (Math.random() > 0.5) {
-          roid.points.reverse();
-        }
-        roid.vel.rot = Math.random() * 2 - 1;
-        roid.move(roid.scale * 3); // give them a little push
-        Game.sprites.push(roid);
-      }
-    }
-    Game.explosionAt(other.x, other.y);
-    this.die();
-  };
-};
-Asteroid.prototype = new Sprite();
+EnemyBullet.prototype = new Sprite();
 
 Explosion = function () {
   this.init("explosion");
@@ -702,6 +798,7 @@ Explosion = function () {
         this.context.moveTo(line[0], line[1]);
         this.context.lineTo(line[2], line[3]);
       }
+      this.context.strokeStyle = "#CC3232";
       this.context.stroke();
       this.context.restore();
     }
@@ -771,6 +868,8 @@ GridNode = function () {
 // http://typeface.neocracy.org
 Text = {
   renderGlyph: function (ctx, face, char) {
+    this.context.strokeStyle = "#FFFFFF";
+    this.context.fillStyle = "#FFFFFF";
 
     var glyph = face.glyphs[char];
 
@@ -826,6 +925,8 @@ Text = {
     this.context.beginPath();
     var chars = text.split('');
     var charsLength = chars.length;
+    this.context.strokeStyle = "#FFFFFF";
+    this.context.fillStyle = "#FFFFFF";
     for (var i = 0; i < charsLength; i++) {
       this.renderGlyph(this.context, this.face, chars[i]);
     }
@@ -870,38 +971,13 @@ SFX.muted = true;
 
 Game = {
   score: 0,
-  totalAsteroids: 5,
   lives: 0,
 
-  canvasWidth: 800,
-  canvasHeight: 600,
+  canvasWidth: 1000,
+  canvasHeight: 700,
 
   sprites: [],
   ship: null,
-  bigAlien: null,
-
-  nextBigAlienTime: null,
-
-
-  spawnAsteroids: function (count) {
-    if (!count) count = this.totalAsteroids;
-    for (var i = 0; i < count; i++) {
-      var roid = new Asteroid();
-      roid.x = Math.random() * this.canvasWidth;
-      roid.y = Math.random() * this.canvasHeight;
-      while (!roid.isClear()) {
-        roid.x = Math.random() * this.canvasWidth;
-        roid.y = Math.random() * this.canvasHeight;
-      }
-      roid.vel.x = Math.random() * 4 - 2;
-      roid.vel.y = Math.random() * 4 - 2;
-      if (Math.random() > 0.5) {
-        roid.points.reverse();
-      }
-      roid.vel.rot = Math.random() * 2 - 1;
-      Game.sprites.push(roid);
-    }
-  },
 
   explosionAt: function (x, y) {
     var splosion = new Explosion();
@@ -913,39 +989,27 @@ Game = {
 
   FSM: {
     boot: function () {
-      Game.spawnAsteroids(5);
-      this.state = 'waiting';
-    },
-    waiting: function () {
-      Text.renderText(window.ipad ? 'Touch Screen to Start' : 'Press Space to Start', 36, Game.canvasWidth/2 - 270, Game.canvasHeight/2);
-      if (KEY_STATUS.space || window.gameStart) {
         KEY_STATUS.space = false; // hack so we don't shoot right away
         window.gameStart = false;
         this.state = 'start';
-      }
     },
     start: function () {
-      for (var i = 0; i < Game.sprites.length; i++) {
-        if (Game.sprites[i].name == 'asteroid') {
-          Game.sprites[i].die();
-        } else if (Game.sprites[i].name == 'bullet' ||
-                   Game.sprites[i].name == 'bigalien') {
-          Game.sprites[i].visible = false;
+      for (sprite in Game.sprites) {
+        if (Game.sprites[sprite].name == 'asteroid') {
+          Game.sprites[sprite].die();
+        } else if (Game.sprites[sprite].name == 'bullet') {
+          Game.sprites[sprite].visible = false;
         }
       }
 
-      Game.score = 0;
-      Game.lives = 2;
-      Game.totalAsteroids = 2;
-      Game.spawnAsteroids();
-
-      Game.nextBigAlienTime = Date.now() + 30000 + (30000 * Math.random());
+      setScore(0);
+      Game.lives = 7;
 
       this.state = 'spawn_ship';
     },
     spawn_ship: function () {
-      Game.ship.x = Game.canvasWidth / 2;
-      Game.ship.y = Game.canvasHeight / 2;
+      Game.ship.x = Math.floor(Game.canvasWidth * Math.random());
+      Game.ship.y = Math.floor(Game.canvasHeight * Math.random());
       if (Game.ship.isClear()) {
         Game.ship.rot = 0;
         Game.ship.vel.x = 0;
@@ -955,19 +1019,6 @@ Game = {
       }
     },
     run: function () {
-      for (var i = 0; i < Game.sprites.length; i++) {
-        if (Game.sprites[i].name == 'asteroid') {
-          break;
-        }
-      }
-      if (i == Game.sprites.length) {
-        this.state = 'new_level';
-      }
-      if (!Game.bigAlien.visible &&
-          Date.now() > Game.nextBigAlienTime) {
-        Game.bigAlien.visible = true;
-        Game.nextBigAlienTime = Date.now() + (30000 * Math.random());
-      }
     },
     new_level: function () {
       if (this.timer == null) {
@@ -976,9 +1027,6 @@ Game = {
       // wait a second before spawning more asteroids
       if (Date.now() - this.timer > 1000) {
         this.timer = null;
-        Game.totalAsteroids++;
-        if (Game.totalAsteroids > 12) Game.totalAsteroids = 12;
-        Game.spawnAsteroids();
         this.state = 'run';
       }
     },
@@ -997,14 +1045,16 @@ Game = {
       }
     },
     end_game: function () {
-      Text.renderText('GAME OVER', 50, Game.canvasWidth/2 - 160, Game.canvasHeight/2 + 10);
+      Text.renderText('GAME OVER RESTARTING...', 50, 30, Game.canvasHeight/2 + 10);
       if (this.timer == null) {
         this.timer = Date.now();
       }
-      // wait 5 seconds then go back to waiting state
+      // wait 5 seconds then go back to start state
       if (Date.now() - this.timer > 5000) {
         this.timer = null;
-        this.state = 'waiting';
+        this.state = 'start';
+        var postScoreRef = scoreListRef.push();
+        postScoreRef.setWithPriority({user: currentUser, score: Game.score}, Game.score);
       }
 
       window.gameStart = false;
@@ -1071,23 +1121,18 @@ $(function () {
 
   var ship = new Ship();
 
-  ship.x = Game.canvasWidth / 2;
-  ship.y = Game.canvasHeight / 2;
+//  ship.x = Game.canvasWidth / 2;
+//  ship.y = Game.canvasHeight / 2;
 
   sprites.push(ship);
 
   ship.bullets = [];
-  for (var i = 0; i < 10; i++) {
+  for (var i = 0; i < 10; i++) { // XXX
     var bull = new Bullet();
     ship.bullets.push(bull);
     sprites.push(bull);
   }
   Game.ship = ship;
-
-  var bigAlien = new BigAlien();
-  bigAlien.setup();
-  sprites.push(bigAlien);
-  Game.bigAlien = bigAlien;
 
   var extraDude = new Ship();
   extraDude.scale = 0.6;
@@ -1097,8 +1142,6 @@ $(function () {
 
   var i, j = 0;
 
-  var paused = false;
-  var showFramerate = false;
   var avgFramerate = 0;
   var frameCount = 0;
   var elapsedCounter = 0;
@@ -1148,33 +1191,28 @@ $(function () {
     lastFrame = thisFrame;
     delta = elapsed / 30;
 
-    for (i = 0; i < sprites.length; i++) {
-
-      sprites[i].run(delta);
-
-      if (sprites[i].reap) {
-        sprites[i].reap = false;
-        sprites.splice(i, 1);
-        i--;
+    var i = 0;
+    for (sprite in sprites) {
+      var s = sprites[sprite];
+      if(typeof(s) != undefined) {
+        s.run(delta);
+        if (s.reap) {
+          s.reap = false;
+          sprites.splice(i, 1);
+          i--;
+        }
       }
+      i++;
     }
-
-    // score
-    var score_text = ''+Game.score;
-    Text.renderText(score_text, 18, Game.canvasWidth - 14 * score_text.length, 20);
 
     // extra dudes
     for (i = 0; i < Game.lives; i++) {
       context.save();
       extraDude.x = Game.canvasWidth - (8 * (i + 1));
-      extraDude.y = 32;
+      extraDude.y = 16;
       extraDude.configureTransform();
       extraDude.draw();
       context.restore();
-    }
-
-    if (showFramerate) {
-      Text.renderText(''+avgFramerate, 24, Game.canvasWidth - 38, Game.canvasHeight - 2);
     }
 
     frameCount++;
@@ -1185,33 +1223,120 @@ $(function () {
       frameCount = 0;
     }
 
-    if (paused) {
-      Text.renderText('PAUSED', 72, Game.canvasWidth/2 - 160, 120);
-    } else {
-      requestAnimFrame(mainLoop, canvasNode);
-    }
+    requestAnimFrame(mainLoop, canvasNode);
   };
 
-  mainLoop();
+  var cb = new Firebase(frefR).child('.info/connected').on('value', function(snap) {
+    if (snap.val()) {
+      new Firebase(frefR).child('.info/connected').off('value', cb);
+      mainLoop();
+    }
+  });  
 
   $(window).keydown(function (e) {
     switch (KEY_CODES[e.keyCode]) {
-      case 'f': // show framerate
-        showFramerate = !showFramerate;
-        break;
-      case 'p': // pause
-        paused = !paused;
-        if (!paused) {
-          // start up again
-          lastFrame = Date.now();
-          mainLoop();
-        }
-        break;
       case 'm': // mute
         SFX.muted = !SFX.muted;
         break;
     }
   });
+
+  asteroids.child('players').on('child_added', function(snapshot) {
+    if(snapshot.name() != myship.name()) {
+	var enemy = new EnemyShip();
+	enemy.acc = snapshot.val().ship.acc;
+	enemy.vel = snapshot.val().ship.vel;
+	enemy.x = snapshot.val().ship.x;
+	enemy.y = snapshot.val().ship.y;
+	enemy.rot = snapshot.val().ship.rot;
+	enemy.accb = snapshot.val().ship.accb;
+	enemy.visible = true;
+	enemy.user = snapshot.val().user;
+	enemy.fref = asteroids.child('players').child(snapshot.name());
+	if(typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+	  enemy.eimg = new Image();
+	  enemy.eimg.src = enemy.user.photo;
+	}
+	else {
+	  enemy.eimg = null;
+	}
+	Game.sprites[snapshot.name()] = enemy;
+    }
+    else {
+    }
+  });
+
+  asteroids.child('players').on('child_changed', function(snapshot) {
+    if(snapshot.name() != myship.name()) {
+	var enemy = Game.sprites[snapshot.name()];
+	enemy.visible = true;
+	enemy.acc = snapshot.val().ship.acc;
+	enemy.vel = snapshot.val().ship.vel;
+	enemy.x = snapshot.val().ship.x;
+	enemy.y = snapshot.val().ship.y;
+	enemy.rot = snapshot.val().ship.rot;
+	enemy.accb = snapshot.val().ship.accb;
+	enemy.user = snapshot.val().user;
+	enemy.fref = asteroids.child('players').child(snapshot.name());
+	if(typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+	  enemy.eimg = new Image();
+	  enemy.eimg.src = enemy.user.photo;
+	}
+	else {
+	  enemy.eimg = null;
+	}
+    }
+    else {
+    }
+  });
+
+  asteroids.child('players').on('child_removed', function(snapshot) {
+    if(snapshot.name() != myship.name()) {
+	var enemy = Game.sprites[snapshot.name()];
+	enemy.visible = false;
+	delete Game.sprites[snapshot.name()];
+    }
+    else {
+      Game.ship.collision(null);
+    }
+  });
+
+
+  // bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
+  asteroids.child('bullets').on('child_added', function(snapshot) {
+     var bullet = snapshot.val();
+     if(bullet.s != myship.name()) {
+	var enemybullet = new EnemyBullet();
+	enemybullet.x = bullet.x;
+	enemybullet.y = bullet.y;
+	enemybullet.vel = bullet.vel;
+	enemybullet.visible = true;
+	enemybullet.fref = asteroids.child('bullets').child(snapshot.name());
+	Game.sprites['bullet:' + snapshot.name()] = enemybullet;
+     }
+  });
+
+  asteroids.child('bullets').on('child_removed', function(snapshot) {
+     var bullet = snapshot.val();
+     if(bullet.s != myship.name()) {
+	var enemybullet = Game.sprites['bullet:' + snapshot.name()];
+	if(enemybullet != null) {
+	  enemybullet.visible = false;
+	}
+	delete Game.sprites['bullet:' + snapshot.name()];
+     }
+  });
+
+  updateName();
+
+  var at = $.getUrlVar('access_token');
+  if(! (typeof at === "undefined")) {
+	$.get('https://api.singly.com/profiles/twitter?access_token=' + at, function(data) {
+		currentUser = { name: data.data.screen_name, type: 'twitter', photo: data.data.profile_image_url };
+  		updateName();
+		$('#login').hide();
+	});
+  }
 });
 
 // vim: fdl=0
