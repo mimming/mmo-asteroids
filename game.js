@@ -63,7 +63,7 @@ var frefL = frefR + 'leaderboard';
 // Firebase.enableLogging(true);
 var asteroids = new Firebase(frefA);
 var myship = asteroids.child('players').push();
-myship.removeOnDisconnect();
+myship.onDisconnect().remove();
 
 // Leaderboard start
 var LEADERBOARD_SIZE = 25;
@@ -556,8 +556,8 @@ Ship = function () {
             bullet.vel.x = 6 * vectorx + this.vel.x;
             bullet.vel.y = 6 * vectory + this.vel.y;
             bullet.visible = true;
-	    bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
-	    bullet.fref.removeOnDisconnect();
+            bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
+            bullet.fref.onDisconnect().remove();
             break;
           }
         }
