@@ -28,7 +28,7 @@
 // Constants
 
 // Keys
-const KEY_CODES = {
+var KEY_CODES = {
   32: 'space',
   37: 'left',
   38: 'up',
@@ -39,25 +39,35 @@ const KEY_CODES = {
   77: 'm'
 };
 
-// The grid sized, used to speed up collision maths. Too small = missed collisions, too big = too slow
-const GRID_SIZE = 60;
-
 // Gameplay constants
-const SHIP_MAX_SPEED = 8;
-const SHIP_ROTATION_RATE = 5;
+var SHIP_MAX_SPEED = 8;
+var SHIP_ROTATION_RATE = 5;
 
-const BULLET_DELAY = 10;
-const BULLET_MAX_COUNT = 10;
-const BULLET_LIFETIME = 50;
+var BULLET_DELAY = 10;
+var BULLET_MAX_COUNT = 10;
+var BULLET_LIFETIME = 50;
 
-// How many leaders to display
-const LEADERBOARD_SIZE = 10;
+var STARTING_LIVES = 7;
 
-// Your Firebase
+
+// UI constants
+var CANVAS_WIDTH = 1000;
+var CANVAS_HEIGHT = 700;
+/**
+ * The grid sized, used to speed up collision maths. 
+ * Too small = missed collisions
+ * Too big = too slow
+ */
+var GRID_SIZE = 60;
+/**
+ * How many leaders to display 
+ */
+var LEADERBOARD_SIZE = 10;
+
+// Firebase connection Stuff
 var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
 var firebaseRefGame = firebaseRef.child('game');
 var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
-
 
 
 // Handle the key events
@@ -91,8 +101,14 @@ myship.onDisconnect().remove();
 var leaderboard = firebaseRefLeaderboard;
 var scoreListRef = leaderboard.child('scoreList');
 var htmlForPath = {};
+
 // TODO: Switch to Anonymous auth?
-var currentUser = { name: "Guest" + Math.floor((10000 * Math.random())), type: 'guest', photo: null };
+// Create a default user
+var currentUser = {
+  name: "Guest" + Math.floor((10000 * Math.random())),
+  type: 'guest',
+  photo: null
+};
 
 function updateName() {
   if (currentUser.type == 'twitter') {
@@ -207,6 +223,9 @@ Matrix = function (rows, columns) {
   };
 };
 
+/**
+ * Sprite: ships, bullets, and all other things inherit behavior from here 
+ */
 Sprite = function () {
   this.init = function (name, points) {
     this.name     = name;
@@ -352,7 +371,7 @@ Sprite = function () {
   this.configureTransform = function () {
     if (!this.visible) return;
 
-    var rad = (this.rot * Math.PI)/180;
+    var rad = (this.rot * Math.PI) / 180;
 
     this.context.translate(this.x, this.y);
     this.context.rotate(rad);
@@ -400,9 +419,9 @@ Sprite = function () {
     if (cn.south.west.nextSprite) canidates.push(cn.south.west.nextSprite);
     return canidates
   };
-  this.checkCollisionsAgainst = function (canidates) {
-    for (var i = 0; i < canidates.length; i++) {
-      var ref = canidates[i];
+  this.checkCollisionsAgainst = function (candidates) {
+    for (var i = 0; i < candidates.length; i++) {
+      var ref = candidates[i];
       do {
         this.checkCollision(ref);
         ref = ref.nextSprite;
@@ -420,7 +439,7 @@ Sprite = function () {
       px = trans[i*2];
       py = trans[i*2 + 1];
       // mozilla doesn't take into account transforms with isPointInPath >:-P
-     //TODO: fix ->($.browser.mozilla) ? this.pointInPolygon(px, py) : this.context.isPointInPath(px, py)
+      //TODO: fix ->($.browser.mozilla) ? this.pointInPolygon(px, py) : this.context.isPointInPath(px, py)
       if (this.context.isPointInPath(px, py)) {
         other.collision(this);
         this.collision(other);
@@ -484,9 +503,11 @@ Sprite = function () {
       this.y = Game.canvasHeight;
     }
   };
-
 };
 
+/**
+ * The player's ship
+ */
 Ship = function () {
   this.init("ship",
             [-5,   4,
@@ -570,14 +591,36 @@ Ship = function () {
       this.vel.y *= 0.95;
     }
 
+    // Write new ship location to Firebase on each key frame
     if ((this.vel.rot != this.previousKeyFrame.vel.rot) || (KEY_STATUS.up != this.previousKeyFrame.accb)) {
-      myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
+      myship.set({
+        ship: {
+          acc: this.acc,
+          vel: this.vel,
+          x: this.x,
+          y: this.y,
+          rot: this.rot,
+          accb: KEY_STATUS.up
+        },
+        user: currentUser
+      });
     }
     this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: KEY_STATUS.up };
 
+    // Write new ship location to Firebase about every 60 frames
     this.keyFrame++;
     if (this.keyFrame % 60 == 0) {
-      myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
+      myship.set({
+        ship: {
+          acc: this.acc, 
+          vel: this.vel, 
+          x: this.x, 
+          y: this.y, 
+          rot: this.rot, 
+          accb: KEY_STATUS.up 
+        }, 
+        user: currentUser
+      });
     }
   };
 
@@ -596,12 +639,43 @@ Ship = function () {
     }
     this.currentNode = null;
     Game.lives--;
-    if (other != null && other.name == "enemyship") deltaScore(Math.floor(100 * Math.random()));
+    if (other != null && other.name == "enemyship") 
+      deltaScore(Math.floor(100 * Math.random()));
   };
 
+  this.draw = function () {
+    if (!this.visible) return;
+
+    this.context.lineWidth = 1.5 / this.scale;
+
+    for (child in this.children) {
+      this.children[child].draw();
+    }
+
+    this.context.beginPath();
+
+    this.context.moveTo(this.points[0], this.points[1]);
+    for (var i = 1; i < this.points.length/2; i++) {
+      var xi = i*2;
+      var yi = xi + 1;
+      this.context.lineTo(this.points[xi], this.points[yi]);
+    }
+
+    this.context.closePath();
+    this.context.strokeStyle = this.strokeStyle;
+
+    if(this.eimg != null) {
+      this.context.drawImage(this.eimg, 0, 0, 20, 20);
+    }
+
+    this.context.stroke();
+  };
 };
 Ship.prototype = new Sprite();
 
+/**
+ * Everyone elses' ship (because everyone else is... the enemy!)
+ */
 EnemyShip = function () {
   this.init("enemyship",
             [-5,   4,
@@ -627,7 +701,7 @@ EnemyShip = function () {
 
     this.context.lineWidth = 1.5 / this.scale;
 
-    for (child in this.children) {
+    for (var child in this.children) {
       this.children[child].draw();
     }
 
@@ -643,14 +717,14 @@ EnemyShip = function () {
     this.context.closePath();
     this.context.strokeStyle = this.strokeStyle;
     if(this.eimg != null) {
-     this.context.drawImage(this.eimg, 0, 0, 20, 20);
+      this.context.drawImage(this.eimg, 0, 0, 20, 20);
     }
     this.context.stroke();
   };
 
   this.preMove = function (delta) {
     // limit the ship's speed
-    if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > 8) {
+    if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > SHIP_MAX_SPEED) {
       this.vel.x *= 0.95;
       this.vel.y *= 0.95;
     }
@@ -675,13 +749,14 @@ EnemyShip = function () {
     this.visible = false;
     this.currentNode.leave(this);
     this.currentNode = null;
-    //Game.lives--;
   };
 
 };
 EnemyShip.prototype = new Sprite();
 
-
+/**
+ * Player's bullet
+ */
 Bullet = function () {
   this.init("bullet", [0, 0]);
   this.time = 0;
@@ -815,6 +890,9 @@ Explosion = function () {
 };
 Explosion.prototype = new Sprite();
 
+/**
+ * Used when display grid is enabled with 'g' key
+ */
 GridNode = function () {
   this.north = null;
   this.south = null;
@@ -973,8 +1051,8 @@ Game = {
   score: 0,
   lives: 0,
 
-  canvasWidth: 1000,
-  canvasHeight: 700,
+  canvasWidth: CANVAS_WIDTH,
+  canvasHeight: CANVAS_HEIGHT,
 
   sprites: [],
   ship: null,
@@ -987,6 +1065,7 @@ Game = {
     Game.sprites.push(splosion);
   },
 
+  // Finite state machine of game progression
   FSM: {
     boot: function () {
         KEY_STATUS.space = false; // hack so we don't shoot right away
@@ -1003,7 +1082,7 @@ Game = {
       }
 
       setScore(0);
-      Game.lives = 7;
+      Game.lives = STARTING_LIVES;
 
       this.state = 'spawn_ship';
     },
@@ -1019,16 +1098,6 @@ Game = {
       }
     },
     run: function () {
-    },
-    new_level: function () {
-      if (this.timer == null) {
-        this.timer = Date.now();
-      }
-      // wait a second before spawning more asteroids
-      if (Date.now() - this.timer > 1000) {
-        this.timer = null;
-        this.state = 'run';
-      }
     },
     player_died: function () {
       if (Game.lives < 0) {
@@ -1059,7 +1128,6 @@ Game = {
 
       window.gameStart = false;
     },
-
     execute: function () {
       this[this.state]();
     },
@@ -1069,6 +1137,7 @@ Game = {
 };
 
 
+// Rendering lives in a JQuery
 $(function () {
   var canvas = $("#canvas");
   Game.canvasWidth  = canvas.width();
@@ -1131,11 +1200,11 @@ $(function () {
   }
   Game.ship = ship;
 
-  var extraDude = new Ship();
-  extraDude.scale = 0.6;
-  extraDude.visible = true;
-  extraDude.preMove = null;
-  extraDude.children = [];
+  var extraLife = new Ship();
+  extraLife.scale = 0.6;
+  extraLife.visible = true;
+  extraLife.preMove = null;
+  extraLife.children = [];
 
   var avgFramerate = 0;
   var frameCount = 0;
@@ -1200,13 +1269,13 @@ $(function () {
       i++;
     }
 
-    // extra dudes
+    // extra lives
     for (i = 0; i < Game.lives; i++) {
       context.save();
-      extraDude.x = Game.canvasWidth - (8 * (i + 1));
-      extraDude.y = 16;
-      extraDude.configureTransform();
-      extraDude.draw();
+      extraLife.x = Game.canvasWidth - (8 * (i + 1));
+      extraLife.y = 16;
+      extraLife.configureTransform();
+      extraLife.draw();
       context.restore();
     }
 
@@ -1237,6 +1306,7 @@ $(function () {
     }
   });
 
+  // Sync enemy ships from Firebase to local game state
   firebaseRefGame.child('players').on('child_added', function (snapshot) {
     if (snapshot.key() != myship.key()) {
       var enemy = new EnemyShip();
@@ -1294,6 +1364,7 @@ $(function () {
   });
 
 
+  // Sync enemy bullets from Firebase to local game state
   firebaseRefGame.child('bullets').on('child_added', function (snapshot) {
     var bullet = snapshot.val();
     if (bullet.s != myship.key()) {
@@ -1321,13 +1392,17 @@ $(function () {
   updateName();
 
   var at = $.getUrlVar('access_token');
-    
-  if(! (typeof at === "undefined")) {
-	$.get('https://api.singly.com/profiles/twitter?access_token=' + at, function(data) {
-		currentUser = { name: data.data.screen_name, type: 'twitter', photo: data.data.profile_image_url };
-  		updateName();
-		$('#login').hide();
-	});
+
+  if (!(typeof at === "undefined")) {
+    $.get('https://api.singly.com/profiles/twitter?access_token=' + at, function (data) {
+      currentUser = { 
+        name: data.data.screen_name, 
+        type: 'twitter', 
+        photo: data.data.profile_image_url 
+      };
+      updateName();
+      $('#login').hide();
+    });
   }
 });
 
