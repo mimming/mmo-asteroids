@@ -152,7 +152,8 @@ function handleScoreRemoved(scoreSnapshot) {
 	delete htmlForPath[scoreSnapshot.key()];
 }
 
-var scoreListView = scoreListRef.limit(LEADERBOARD_SIZE);
+//TODO: use a query to get top scores
+var scoreListView = scoreListRef.limitToLast(LEADERBOARD_SIZE);
 
 scoreListView.on('child_added', function (newScoreSnapshot, prevScoreName) {
 		handleScoreAdded(newScoreSnapshot, prevScoreName);
@@ -1256,7 +1257,7 @@ $(function () {
     delta = elapsed / 30;
 
     var i = 0;
-    for (sprite in sprites) {
+    for (var sprite in sprites) {
       var s = sprites[sprite];
       if(typeof(s) != undefined) {
         s.run(delta);
@@ -1389,21 +1390,28 @@ $(function () {
     }
   });
 
+  //TODO: figure out if I really need this here
   updateName();
-
-  var at = $.getUrlVar('access_token');
-
-  if (!(typeof at === "undefined")) {
-    $.get('https://api.singly.com/profiles/twitter?access_token=' + at, function (data) {
-      currentUser = { 
-        name: data.data.screen_name, 
-        type: 'twitter', 
-        photo: data.data.profile_image_url 
-      };
-      updateName();
-      $('#login').hide();
-    });
-  }
 });
 
 // vim: fdl=0
+
+// Handle login clicks
+$(document).ready(function() {
+  $("#login").click(function() {
+    firebaseRef.authWithOAuthPopup("twitter", function(error, authData) {
+      if (error) {
+        console.log("Login Failed!", error);
+      } else {
+        currentUser = {
+          uid: authData.uid,
+          name: authData.twitter.username,
+          type: authData.provider,
+          photo: authData.twitter.cachedUserProfile.profile_image_url_https
+        };
+        updateName();
+        $('#login').hide();
+      }
+    });
+  });
+});
