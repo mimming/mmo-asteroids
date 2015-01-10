@@ -1,5 +1,4 @@
 /*
-
    Copyright (c) 2010 Doug McInnes
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,10 +18,17 @@
    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN      
    THE SOFTWARE.
-
 */
 
-KEY_CODES = {
+//TODO - Prior to spawning make some indicator so people get an idea of where they're going to show up
+//TODO - Still some ownership issues: who is responsible for the explosion and disappearance?
+//TODO - Display player's icon next to their ship too
+//TODO - sound is broken, fix it
+
+// Constants
+
+// Keys
+const KEY_CODES = {
   32: 'space',
   37: 'left',
   38: 'up',
@@ -30,73 +36,74 @@ KEY_CODES = {
   40: 'down',
   71: 'g',
   72: 'h',
-  77: 'm',
-}
+  77: 'm'
+};
 
-KEY_STATUS = { keyDown:false };
-for (code in KEY_CODES) {
+// The grid sized, used to speed up collision maths. Too small = missed collisions, too big = too slow
+const GRID_SIZE = 60;
+
+// Gameplay constants
+const SHIP_MAX_SPEED = 8;
+const SHIP_ROTATION_RATE = 5;
+
+const BULLET_DELAY = 10;
+const BULLET_MAX_COUNT = 10;
+const BULLET_LIFETIME = 50;
+
+// How many leaders to display
+const LEADERBOARD_SIZE = 10;
+
+// Your Firebase
+var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
+var firebaseRefGame = firebaseRef.child('game');
+var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
+
+
+
+// Handle the key events
+var KEY_STATUS = { keyDown: false };
+for (var code in KEY_CODES) {
   KEY_STATUS[KEY_CODES[code]] = false;
 }
 
-var chatting = false;
-
-$(window).keydown(function (e) {
+$(window).keydown(function (event) {
   KEY_STATUS.keyDown = true;
-  if (KEY_CODES[e.keyCode]) {
-    e.preventDefault();
-    KEY_STATUS[KEY_CODES[e.keyCode]] = true;
+  if (KEY_CODES[event.keyCode]) {
+    event.preventDefault();
+    KEY_STATUS[KEY_CODES[event.keyCode]] = true;
   }
-}).keyup(function (e) {
+}).keyup(function (event) {
   KEY_STATUS.keyDown = false;
-  if (KEY_CODES[e.keyCode]) {
-    e.preventDefault();
-    KEY_STATUS[KEY_CODES[e.keyCode]] = false;
+  if (KEY_CODES[event.keyCode]) {
+    event.preventDefault();
+    KEY_STATUS[KEY_CODES[event.keyCode]] = false;
   }
 });
 
-GRID_SIZE = 60;
 
-var frefR = 'https://mmoasteroids.firebaseio.com/';
-var frefA = frefR + 'game';
-var frefL = frefR + 'leaderboard';
+// Add player's ship to Firebase
+var myship = firebaseRefGame.child('players').push();
 
-// Firebase.enableLogging(true);
-var asteroids = new Firebase(frefA);
-var myship = asteroids.child('players').push();
+// Schedule player removal on disconnect
 myship.onDisconnect().remove();
 
-// Leaderboard start
-var LEADERBOARD_SIZE = 25;
-// Should the leaderboard be global? Move it to delta?
-var leaderboard = new Firebase(frefL);
+// Display the leaderboard
+var leaderboard = firebaseRefLeaderboard;
 var scoreListRef = leaderboard.child('scoreList');
 var htmlForPath = {};
+// TODO: Switch to Anonymous auth?
 var currentUser = { name: "Guest" + Math.floor((10000 * Math.random())), type: 'guest', photo: null };
 
 function updateName() {
- if(currentUser.type == 'twitter') {
-   $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
- }
- else {
-   $('#my-name').text(currentUser.name);
- }
+  if (currentUser.type == 'twitter') {
+    $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
+  }
+  else {
+    $('#my-name').text(currentUser.name);
+  }
 }
 
 updateName();
-
-/*twttr.anywhere(function (T) {
-  if(T.isConnected()) {
-    currentUser = { name: T.currentUser.data('screen_name'), type: 'twitter', photo: T.currentUser.data('profile_image_url') };
-    $('#login').remove();
-  }
-  updateName();
-
-  T.bind("authComplete", function (e, user) {
-    currentUser = { name: user.data('screen_name'), type: 'twitter', photo: user.data('profile_image_url') };
-    $('#login').remove();
-    updateName();
-  });
-});*/
 				    
 function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	var newScoreRow = $("<tr/>");
@@ -111,7 +118,7 @@ function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	}
 
 	// Store a reference to the table row so we can get it again later.
-	htmlForPath[scoreSnapshot.name()] = newScoreRow;
+	htmlForPath[scoreSnapshot.key()] = newScoreRow;
 
 	// Insert the new score in the appropriate place in the GUI.
 	if (lowerScoreName === null) {
@@ -124,9 +131,9 @@ function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 }
 
 function handleScoreRemoved(scoreSnapshot) {
-	var removedScoreRow = htmlForPath[scoreSnapshot.name()];
+	var removedScoreRow = htmlForPath[scoreSnapshot.key()];
 	removedScoreRow.remove();
-	delete htmlForPath[scoreSnapshot.name()];
+	delete htmlForPath[scoreSnapshot.key()];
 }
 
 var scoreListView = scoreListRef.limit(LEADERBOARD_SIZE);
@@ -186,7 +193,7 @@ Matrix = function (rows, columns) {
         k++;
       }
     }
-  }
+  };
 
   this.multiply = function () {
     var vector = new Array(rows);
@@ -371,6 +378,11 @@ Sprite = function () {
 
     this.context.closePath();
     this.context.strokeStyle = this.strokeStyle;
+
+    if(this.eimg != null) {
+        this.context.drawImage(this.eimg, 0, 0, 20, 20);
+    }
+
     this.context.stroke();
   };
   this.findCollisionCanidates = function () {
@@ -408,31 +420,13 @@ Sprite = function () {
       px = trans[i*2];
       py = trans[i*2 + 1];
       // mozilla doesn't take into account transforms with isPointInPath >:-P
-      if (($.browser.mozilla) ? this.pointInPolygon(px, py) : this.context.isPointInPath(px, py)) {
+     //TODO: fix ->($.browser.mozilla) ? this.pointInPolygon(px, py) : this.context.isPointInPath(px, py)
+      if (this.context.isPointInPath(px, py)) {
         other.collision(this);
         this.collision(other);
         return;
       }
     }
-  };
-  this.pointInPolygon = function (x, y) {
-    var points = this.transformedPoints();
-    var j = 2;
-    var y0, y1;
-    var oddNodes = false;
-    for (var i = 0; i < points.length; i += 2) {
-      y0 = points[i + 1];
-      y1 = points[j + 1];
-      if ((y0 < y && y1 >= y) ||
-          (y1 < y && y0 >= y)) {
-        if (points[i]+(y-y0)/(y1-y0)*(points[j]-points[i]) < x) {
-          oddNodes = !oddNodes;
-        }
-      }
-      j += 2
-      if (j == points.length) j = 0;
-    }
-    return oddNodes;
   };
   this.collision = function () {
   };
@@ -519,17 +513,17 @@ Ship = function () {
 
   this.preMove = function (delta) {
     if (KEY_STATUS.left) {
-      this.vel.rot = -5;
+      this.vel.rot = -SHIP_ROTATION_RATE;
     } else if (KEY_STATUS.right) {
-      this.vel.rot = 5;
+      this.vel.rot = SHIP_ROTATION_RATE;
     } else {
       this.vel.rot = 0;
     }
 
     if (KEY_STATUS.up) {
-      var rad = ((this.rot-90) * Math.PI)/180;
-      this.acc.x = 0.5 * Math.cos(rad);
-      this.acc.y = 0.5 * Math.sin(rad);
+      var keyUpRad = ((this.rot - 90) * Math.PI) / 180;
+      this.acc.x = 0.5 * Math.cos(keyUpRad);
+      this.acc.y = 0.5 * Math.sin(keyUpRad);
       this.children.exhaust.visible = Math.random() > 0.1;
     } else {
       this.acc.x = 0;
@@ -540,14 +534,15 @@ Ship = function () {
     if (this.bulletCounter > 0) {
       this.bulletCounter -= delta;
     }
+    
     if (KEY_STATUS.space) {
       if (this.bulletCounter <= 0) {
-        this.bulletCounter = 10; // XXX
+        this.bulletCounter = BULLET_DELAY;
         for (var i = 0; i < this.bullets.length; i++) {
           if (!this.bullets[i].visible) {
             SFX.laser();
             var bullet = this.bullets[i];
-            var rad = ((this.rot-90) * Math.PI)/180;
+            var rad = ((this.rot - 90) * Math.PI) / 180;
             var vectorx = Math.cos(rad);
             var vectory = Math.sin(rad);
             // move to the nose of the ship
@@ -556,7 +551,12 @@ Ship = function () {
             bullet.vel.x = 6 * vectorx + this.vel.x;
             bullet.vel.y = 6 * vectory + this.vel.y;
             bullet.visible = true;
-            bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
+            bullet.fref = firebaseRefGame.child('bullets').push({
+              s: myship.key(),
+              x: bullet.x,
+              y: bullet.y,
+              vel: bullet.vel
+            });
             bullet.fref.onDisconnect().remove();
             break;
           }
@@ -565,18 +565,18 @@ Ship = function () {
     }
 
     // limit the ship's speed
-    if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > 8) {
+    if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > SHIP_MAX_SPEED) {
       this.vel.x *= 0.95;
       this.vel.y *= 0.95;
     }
 
-    if((this.vel.rot != this.previousKeyFrame.vel.rot) || (KEY_STATUS.up != this.previousKeyFrame.accb)) {
+    if ((this.vel.rot != this.previousKeyFrame.vel.rot) || (KEY_STATUS.up != this.previousKeyFrame.accb)) {
       myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
     }
     this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: KEY_STATUS.up };
 
     this.keyFrame++;
-    if(this.keyFrame % 60 == 0) {
+    if (this.keyFrame % 60 == 0) {
       myship.set({ship: {acc: this.acc, vel: this.vel, x: this.x, y: this.y, rot: this.rot, accb: KEY_STATUS.up }, user: currentUser  });
     }
   };
@@ -708,7 +708,7 @@ Bullet = function () {
     if (this.visible) {
       this.time += delta;
     }
-    if (this.time > 50) { // XXX
+    if (this.time > BULLET_LIFETIME) {
       this.visible = false;
       this.time = 0;
       this.fref.remove();
@@ -940,8 +940,8 @@ Text = {
 };
 
 SFX = {
-  laser:     new Audio('39459__THE_bizniss__laser.wav'),
-  explosion: new Audio('51467__smcameron__missile_explosion.wav')
+  laser:     new Audio('assets/39459__THE_bizniss__laser.wav'),
+  explosion: new Audio('assets/51467__smcameron__missile_explosion.wav')
 };
 
 // preload audio
@@ -1121,16 +1121,13 @@ $(function () {
 
   var ship = new Ship();
 
-//  ship.x = Game.canvasWidth / 2;
-//  ship.y = Game.canvasHeight / 2;
-
   sprites.push(ship);
 
   ship.bullets = [];
-  for (var i = 0; i < 10; i++) { // XXX
-    var bull = new Bullet();
-    ship.bullets.push(bull);
-    sprites.push(bull);
+  for (var i = 0; i < BULLET_MAX_COUNT; i++) {
+    var bullet = new Bullet();
+    ship.bullets.push(bullet);
+    sprites.push(bullet);
   }
   Game.ship = ship;
 
@@ -1139,8 +1136,6 @@ $(function () {
   extraDude.visible = true;
   extraDude.preMove = null;
   extraDude.children = [];
-
-  var i, j = 0;
 
   var avgFramerate = 0;
   var frameCount = 0;
@@ -1226,9 +1221,10 @@ $(function () {
     requestAnimFrame(mainLoop, canvasNode);
   };
 
-  var cb = new Firebase(frefR).child('.info/connected').on('value', function(snap) {
+  // Presence
+  var cb = firebaseRef.child('.info/connected').on('value', function(snap) {
     if (snap.val()) {
-      new Firebase(frefR).child('.info/connected').off('value', cb);
+      firebaseRef.child('.info/connected').off('value', cb);
       mainLoop();
     }
   });  
@@ -1241,60 +1237,56 @@ $(function () {
     }
   });
 
-  asteroids.child('players').on('child_added', function(snapshot) {
-    if(snapshot.name() != myship.name()) {
-	var enemy = new EnemyShip();
-	enemy.acc = snapshot.val().ship.acc;
-	enemy.vel = snapshot.val().ship.vel;
-	enemy.x = snapshot.val().ship.x;
-	enemy.y = snapshot.val().ship.y;
-	enemy.rot = snapshot.val().ship.rot;
-	enemy.accb = snapshot.val().ship.accb;
-	enemy.visible = true;
-	enemy.user = snapshot.val().user;
-	enemy.fref = asteroids.child('players').child(snapshot.name());
-	if(typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
-	  enemy.eimg = new Image();
-	  enemy.eimg.src = enemy.user.photo;
-	}
-	else {
-	  enemy.eimg = null;
-	}
-	Game.sprites[snapshot.name()] = enemy;
-    }
-    else {
+  firebaseRefGame.child('players').on('child_added', function (snapshot) {
+    if (snapshot.key() != myship.key()) {
+      var enemy = new EnemyShip();
+      enemy.acc = snapshot.val().ship.acc;
+      enemy.vel = snapshot.val().ship.vel;
+      enemy.x = snapshot.val().ship.x;
+      enemy.y = snapshot.val().ship.y;
+      enemy.rot = snapshot.val().ship.rot;
+      enemy.accb = snapshot.val().ship.accb;
+      enemy.visible = true;
+      enemy.user = snapshot.val().user;
+      enemy.fref = firebaseRefGame.child('players').child(snapshot.key());
+      if (typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+        enemy.eimg = new Image();
+        enemy.eimg.src = enemy.user.photo;
+      } else {
+        enemy.eimg = null;
+      }
+      Game.sprites[snapshot.key()] = enemy;
+    } else {
     }
   });
 
-  asteroids.child('players').on('child_changed', function(snapshot) {
-    if(snapshot.name() != myship.name()) {
-	var enemy = Game.sprites[snapshot.name()];
-	enemy.visible = true;
-	enemy.acc = snapshot.val().ship.acc;
-	enemy.vel = snapshot.val().ship.vel;
-	enemy.x = snapshot.val().ship.x;
-	enemy.y = snapshot.val().ship.y;
-	enemy.rot = snapshot.val().ship.rot;
-	enemy.accb = snapshot.val().ship.accb;
-	enemy.user = snapshot.val().user;
-	enemy.fref = asteroids.child('players').child(snapshot.name());
-	if(typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
-	  enemy.eimg = new Image();
-	  enemy.eimg.src = enemy.user.photo;
-	}
-	else {
-	  enemy.eimg = null;
-	}
-    }
-    else {
+  firebaseRefGame.child('players').on('child_changed', function (snapshot) {
+    if (snapshot.key() != myship.key()) {
+      var enemy = Game.sprites[snapshot.key()];
+      enemy.visible = true;
+      enemy.acc = snapshot.val().ship.acc;
+      enemy.vel = snapshot.val().ship.vel;
+      enemy.x = snapshot.val().ship.x;
+      enemy.y = snapshot.val().ship.y;
+      enemy.rot = snapshot.val().ship.rot;
+      enemy.accb = snapshot.val().ship.accb;
+      enemy.user = snapshot.val().user;
+      enemy.fref = firebaseRefGame.child('players').child(snapshot.key());
+      if (typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+        enemy.eimg = new Image();
+        enemy.eimg.src = enemy.user.photo;
+      } else {
+        enemy.eimg = null;
+      }
+    } else {
     }
   });
 
-  asteroids.child('players').on('child_removed', function(snapshot) {
-    if(snapshot.name() != myship.name()) {
-	var enemy = Game.sprites[snapshot.name()];
-	enemy.visible = false;
-	delete Game.sprites[snapshot.name()];
+  firebaseRefGame.child('players').on('child_removed', function (snapshot) {
+    if (snapshot.key() != myship.key()) {
+      var enemy = Game.sprites[snapshot.key()];
+      enemy.visible = false;
+      delete Game.sprites[snapshot.key()];
     }
     else {
       Game.ship.collision(null);
@@ -1302,34 +1294,34 @@ $(function () {
   });
 
 
-  // bullet.fref = asteroids.child('bullets').push({s: myship.name(), x: bullet.x, y: bullet.y, vel: bullet.vel});
-  asteroids.child('bullets').on('child_added', function(snapshot) {
-     var bullet = snapshot.val();
-     if(bullet.s != myship.name()) {
-	var enemybullet = new EnemyBullet();
-	enemybullet.x = bullet.x;
-	enemybullet.y = bullet.y;
-	enemybullet.vel = bullet.vel;
-	enemybullet.visible = true;
-	enemybullet.fref = asteroids.child('bullets').child(snapshot.name());
-	Game.sprites['bullet:' + snapshot.name()] = enemybullet;
-     }
+  firebaseRefGame.child('bullets').on('child_added', function (snapshot) {
+    var bullet = snapshot.val();
+    if (bullet.s != myship.key()) {
+      var enemybullet = new EnemyBullet();
+      enemybullet.x = bullet.x;
+      enemybullet.y = bullet.y;
+      enemybullet.vel = bullet.vel;
+      enemybullet.visible = true;
+      enemybullet.fref = firebaseRefGame.child('bullets').child(snapshot.key());
+      Game.sprites['bullet:' + snapshot.key()] = enemybullet;
+    }
   });
 
-  asteroids.child('bullets').on('child_removed', function(snapshot) {
-     var bullet = snapshot.val();
-     if(bullet.s != myship.name()) {
-	var enemybullet = Game.sprites['bullet:' + snapshot.name()];
-	if(enemybullet != null) {
-	  enemybullet.visible = false;
-	}
-	delete Game.sprites['bullet:' + snapshot.name()];
-     }
+  firebaseRefGame.child('bullets').on('child_removed', function (snapshot) {
+    var bullet = snapshot.val();
+    if (bullet.s != myship.key()) {
+      var enemybullet = Game.sprites['bullet:' + snapshot.key()];
+      if (enemybullet != null) {
+        enemybullet.visible = false;
+      }
+      delete Game.sprites['bullet:' + snapshot.key()];
+    }
   });
 
   updateName();
 
   var at = $.getUrlVar('access_token');
+    
   if(! (typeof at === "undefined")) {
 	$.get('https://api.singly.com/profiles/twitter?access_token=' + at, function(data) {
 		currentUser = { name: data.data.screen_name, type: 'twitter', photo: data.data.profile_image_url };

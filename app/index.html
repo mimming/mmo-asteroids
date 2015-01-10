@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="asteroids.css">
+  <script src="//cdn.firebase.com/js/client/2.0.6/firebase.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+  <script src="assets/vector_battle_regular.typeface.js"></script>
+  <script src="anchor.js"></script>
+  <script src="game.js"></script>
+  <base target="_blank">
+</head>
+<body>
+<div id="asteroids">
+  <div id="header-pane">
+    <div id="header-left">
+      <span>Multiplayer Asteroids! &nbsp; &nbsp; </span>
+      <!--TODO: update <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://www.mmoasteroids.com/" data-text="Multiplayer Online Asteroids" data-via="MMOAsteroids" data-related="Firebase">Tweet</a><script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>-->
+    </div>
+    <div id="header-right">
+      <span id="my-name"></span>: <span id="my-score"></span>
+      <span id="login"><a target="_self"
+                          href="https://api.singly.com/oauth/authenticate?client_id=1ceaff6b5f235c418f487cca5afb3244&redirect_uri=http://moon.mmoasteroids.com/&service=twitter&response_type=token&profile=last">Sign
+        in with Twitter</a></span>
+    </div>
+  </div>
+  <div id="game-pane">
+    <div id="game-container">
+      <div id="left-controls">
+        <div id="up" class='button'>⬆</div>
+        <div id="left" class='button'>⬅</div>
+        <div id="right" class='button'>➡</div>
+      </div>
+      <div id="right-controls">
+        <div id="space" class='button'>Fire</div>
+      </div>
+      <canvas id="canvas" width="1000" height="700"></canvas>
+    </div>
+  </div>
+  <div id="footer-pane">
+    <div class="footer-col">
+      <h3>Wat</h3>
+      <ul>
+        <li>An actual MMO <a href="https://github.com/dmcinnes/HTML5-Asteroids">Asteroids</a> without the April Fools'
+          joke! And, also, ehh.. without asteroids. You get the point.
+        </li>
+        <li>Built on a Sunday afternoon using a <a href="https://www.firebase.com/">super awesome API</a>.</li>
+
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h3>Huh</h3>
+      <ul>
+        <li>Controls? ⬅ ⬆ ➡ [space]</li>
+        <li>Sound? Hit '<strong>m</strong>' to toggle.</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h3>Leaderboard</h3>
+      <table id="leaderboardTable"></table>
+    </div>
+    <div class="footer-col">
+      <h3>Powered By</h3>
+      <a href="https://www.firebase.com/"><img src="assets/firebase.png"></a><br>
+    </div>
+  </div>
+</div>
+</body>
+</html>

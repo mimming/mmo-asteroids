@@ -1,6 +1,6 @@
 body {
   font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  background: url('bg_tile.jpg');
+  background: url('assets/bg_tile.jpg');
   margin-left: auto;
   margin-right: auto;
   width: 1024px;
@@ -47,7 +47,7 @@ A:hover {text-decoration: underline; color: white;}
   float: left;
 }
 
-#footer-col {
+.footer-col {
   float: left;
   width: 33%;
 }
@@ -80,7 +80,7 @@ A:hover {text-decoration: underline; color: white;}
   border: 8px solid #424547;
   margin: 2px;
   color: #424547;
-  background: url('stars.gif');
+  background: url('assets/stars.gif');
 }
 
 .button {
