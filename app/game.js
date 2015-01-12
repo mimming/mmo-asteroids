@@ -23,7 +23,6 @@
 //TODO - Prior to spawning make some indicator so people get an idea of where they're going to show up
 //TODO - Still some ownership issues: who is responsible for the explosion and disappearance?
 //TODO - Display player's icon next to their ship too
-//TODO - sound is broken, fix it
 
 // Constants
 
@@ -47,7 +46,7 @@ var BULLET_DELAY = 10;
 var BULLET_MAX_COUNT = 10;
 var BULLET_LIFETIME = 50;
 
-var STARTING_LIVES = 7;
+var STARTING_LIVES = 1;
 
 
 // UI constants
@@ -69,8 +68,66 @@ var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
 var firebaseRefGame = firebaseRef.child('game');
 var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
 
+// User login
+var currentUser = null;
 
-// Handle the key events
+firebaseRef.onAuth(function(authData) {
+  if(authData) {
+    // User logged in
+    currentUser = {
+      uid: authData.uid,
+      type: authData.provider,
+      name: "Guest " + Math.floor(10000 * Math.random()),
+      photo: null
+    };
+    if(authData.provider == "twitter") {
+      currentUser.name = authData.twitter.username;
+      currentUser.photo =  authData.twitter.cachedUserProfile.profile_image_url_https;
+    }
+  } else {
+    // User logged out
+    currentUser = null;
+  }
+  updateDisplayName(currentUser);
+});
+
+function updateDisplayName(currentUser) {
+  if(currentUser) {
+    if(currentUser.type == "twitter") {
+      $('#login').hide();
+      $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
+    } else {
+      $('#login').show();
+      $('#my-name').text(currentUser.name);
+    }
+  }
+}
+
+// Handle login UI
+$(document).ready(function() {
+  if(currentUser) {
+    // Update the display name again, just in case the user auth'd before the elements were ready
+    updateDisplayName(currentUser);
+  }
+
+  $("#login").click(function() {
+    firebaseRef.authWithOAuthPopup("twitter", function(error, authData) {
+      if (error) {
+        console.log("Twitter login Failed!", error);
+      }
+    });
+  });
+
+  if(currentUser == null) {
+    firebaseRef.authAnonymously(function(error, authData) {
+      if (error) {
+        console.log("Anonymous login Failed!", error);
+      }
+    });
+  }
+});
+
+// Init the key event stuff
 var KEY_STATUS = { keyDown: false };
 for (var code in KEY_CODES) {
   KEY_STATUS[KEY_CODES[code]] = false;
@@ -90,7 +147,6 @@ $(window).keydown(function (event) {
   }
 });
 
-
 // Add player's ship to Firebase
 var myship = firebaseRefGame.child('players').push();
 
@@ -98,37 +154,17 @@ var myship = firebaseRefGame.child('players').push();
 myship.onDisconnect().remove();
 
 // Display the leaderboard
-var leaderboard = firebaseRefLeaderboard;
-var scoreListRef = leaderboard.child('scoreList');
+var scoreListRef = firebaseRefLeaderboard.child('scoreList');
 var htmlForPath = {};
 
-// TODO: Switch to Anonymous auth?
-// Create a default user
-var currentUser = {
-  name: "Guest" + Math.floor((10000 * Math.random())),
-  type: 'guest',
-  photo: null
-};
 
-function updateName() {
-  if (currentUser.type == 'twitter') {
-    $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
-  }
-  else {
-    $('#my-name').text(currentUser.name);
-  }
-}
-
-updateName();
-				    
 function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	var newScoreRow = $("<tr/>");
 	var postedScore = scoreSnapshot.val();
 	if(postedScore.user.type == 'twitter') {
 	  newScoreRow.append($("<td/>").append('<img height=24 src="' + postedScore.user.photo + '">').append($("<strong/>").text('@' + postedScore.user.name)));
 	  newScoreRow.append($("<td/>").text(postedScore.score));
-	}
-	else {
+	} else {
 	  newScoreRow.append($("<td/>").append($("<strong/>").text(postedScore.user.name)));
 	  newScoreRow.append($("<td/>").text(postedScore.score));
 	}
@@ -139,36 +175,19 @@ function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	// Insert the new score in the appropriate place in the GUI.
 	if (lowerScoreName === null) {
 		$("#leaderboardTable").append(newScoreRow);
-	}
-	else {
+	} else {
 		var lowerScoreRow = htmlForPath[lowerScoreName];
 		lowerScoreRow.before(newScoreRow);
 	}
 }
 
-function handleScoreRemoved(scoreSnapshot) {
-	var removedScoreRow = htmlForPath[scoreSnapshot.key()];
-	removedScoreRow.remove();
-	delete htmlForPath[scoreSnapshot.key()];
-}
-
-//TODO: use a query to get top scores
-var scoreListView = scoreListRef.limitToLast(LEADERBOARD_SIZE);
+// User a query to get the top scores
+var scoreListView = scoreListRef.orderByChild("score").limitToLast(LEADERBOARD_SIZE);
 
 scoreListView.on('child_added', function (newScoreSnapshot, prevScoreName) {
-		handleScoreAdded(newScoreSnapshot, prevScoreName);
-		});
+  handleScoreAdded(newScoreSnapshot, prevScoreName);
+});
 
-scoreListView.on('child_removed', function (oldScoreSnapshot) {
-		handleScoreRemoved(oldScoreSnapshot);
-		});
-
-var changedCallback = function (scoreSnapshot, prevScoreName) {
-	handleScoreRemoved(scoreSnapshot);
-	handleScoreAdded(scoreSnapshot, prevScoreName);
-};
-scoreListView.on('child_moved', changedCallback);
-scoreListView.on('child_changed', changedCallback);
 
 function setScore(score) {
    Game.score = score;
@@ -562,7 +581,6 @@ Ship = function () {
         this.bulletCounter = BULLET_DELAY;
         for (var i = 0; i < this.bullets.length; i++) {
           if (!this.bullets[i].visible) {
-            SFX.laser();
             var bullet = this.bullets[i];
             var rad = ((this.rot - 90) * Math.PI) / 180;
             var vectorx = Math.cos(rad);
@@ -626,7 +644,6 @@ Ship = function () {
   };
 
   this.collision = function (other) {
-    SFX.explosion();
     if(other != null) {
       Game.explosionAt(other.x, other.y);
     }
@@ -744,7 +761,6 @@ EnemyShip = function () {
   };
 
   this.collision = function (other) {
-    SFX.explosion();
     Game.explosionAt(other.x, other.y);
     this.fref.remove();
     this.visible = false;
@@ -1018,36 +1034,6 @@ Text = {
   face: null
 };
 
-SFX = {
-  laser:     new Audio('assets/39459__THE_bizniss__laser.wav'),
-  explosion: new Audio('assets/51467__smcameron__missile_explosion.wav')
-};
-
-// preload audio
-for (var sfx in SFX) {
-  (function () {
-    var audio = SFX[sfx];
-    audio.muted = true;
-    audio.play();
-
-    SFX[sfx] = function () {
-      if (!this.muted) {
-        if (audio.duration == 0) {
-          // somehow dropped out
-          audio.load();
-          audio.play();
-        } else {
-          audio.muted = false;
-          audio.currentTime = 0;
-        }
-      }
-      return audio;
-    }
-  })();
-}
-// pre-mute audio
-SFX.muted = true;
-
 Game = {
   score: 0,
   lives: 0,
@@ -1299,13 +1285,6 @@ $(function () {
     }
   });  
 
-  $(window).keydown(function (e) {
-    switch (KEY_CODES[e.keyCode]) {
-      case 'm': // mute
-        SFX.muted = !SFX.muted;
-        break;
-    }
-  });
 
   // Sync enemy ships from Firebase to local game state
   firebaseRefGame.child('players').on('child_added', function (snapshot) {
@@ -1388,30 +1367,5 @@ $(function () {
       }
       delete Game.sprites['bullet:' + snapshot.key()];
     }
-  });
-
-  //TODO: figure out if I really need this here
-  updateName();
-});
-
-// vim: fdl=0
-
-// Handle login clicks
-$(document).ready(function() {
-  $("#login").click(function() {
-    firebaseRef.authWithOAuthPopup("twitter", function(error, authData) {
-      if (error) {
-        console.log("Login Failed!", error);
-      } else {
-        currentUser = {
-          uid: authData.uid,
-          name: authData.twitter.username,
-          type: authData.provider,
-          photo: authData.twitter.cachedUserProfile.profile_image_url_https
-        };
-        updateName();
-        $('#login').hide();
-      }
-    });
   });
 });
