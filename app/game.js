@@ -20,7 +20,8 @@
    THE SOFTWARE.
 */
 
-//TODO - Display player's icon next to their ship too
+//TODO - Anonymous users should have persistent names across visits
+//TODO - add touch controls for mobile
 
 // Constants
 
@@ -126,12 +127,14 @@ $(document).ready(function() {
   }
 });
 
+
 // Init the key event stuff
 var KEY_STATUS = { keyDown: false };
 for (var code in KEY_CODES) {
   KEY_STATUS[KEY_CODES[code]] = false;
 }
 
+// Capture key events
 $(window).keydown(function (event) {
   KEY_STATUS.keyDown = true;
   if (KEY_CODES[event.keyCode]) {
@@ -152,10 +155,11 @@ var myship = firebaseRefGame.child('players').push();
 // Schedule player removal on disconnect
 myship.onDisconnect().remove();
 
+// Leaderboard stuff
+
 // Display the leaderboard
 var scoreListRef = firebaseRefLeaderboard.child('scoreList');
 var htmlForPath = {};
-
 
 function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	var newScoreRow = $("<tr/>");
@@ -202,8 +206,7 @@ function updateScore() {
      $("#my-score").html(Game.score);
 }
 
-// Leaderboard end
-
+// Rendering stuff
 
 Matrix = function (rows, columns) {
   var i, j;
@@ -241,6 +244,8 @@ Matrix = function (rows, columns) {
     return vector;
   };
 };
+
+// The game pieces (sprites)
 
 /**
  * Sprite: ships, bullets, and all other things inherit behavior from here 
@@ -1033,6 +1038,9 @@ Text = {
   face: null
 };
 
+/**
+ * The game mechanics and main loop
+ */
 Game = {
   score: 0,
   lives: 0,
@@ -1123,7 +1131,7 @@ Game = {
 };
 
 
-// Rendering lives in a JQuery
+// Rendering the game in a JQuery
 $(function () {
   var canvas = $("#canvas");
   Game.canvasWidth  = canvas.width();
