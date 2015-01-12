@@ -20,8 +20,6 @@
    THE SOFTWARE.
 */
 
-//TODO - Prior to spawning make some indicator so people get an idea of where they're going to show up
-//TODO - Still some ownership issues: who is responsible for the explosion and disappearance?
 //TODO - Display player's icon next to their ship too
 
 // Constants
@@ -33,9 +31,7 @@ var KEY_CODES = {
   38: 'up',
   39: 'right',
   40: 'down',
-  71: 'g',
-  72: 'h',
-  77: 'm'
+  71: 'g'
 };
 
 // Gameplay constants
@@ -46,7 +42,7 @@ var BULLET_DELAY = 10;
 var BULLET_MAX_COUNT = 10;
 var BULLET_LIFETIME = 50;
 
-var STARTING_LIVES = 1;
+var STARTING_LIVES = 4;
 
 
 // UI constants
@@ -70,6 +66,7 @@ var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
 
 // User login
 var currentUser = null;
+var currentUserImage = null;
 
 firebaseRef.onAuth(function(authData) {
   if(authData) {
@@ -83,6 +80,8 @@ firebaseRef.onAuth(function(authData) {
     if(authData.provider == "twitter") {
       currentUser.name = authData.twitter.username;
       currentUser.photo =  authData.twitter.cachedUserProfile.profile_image_url_https;
+      currentUserImage = new Image();
+      currentUserImage.src = currentUser.photo;
     }
   } else {
     // User logged out
@@ -682,8 +681,8 @@ Ship = function () {
     this.context.closePath();
     this.context.strokeStyle = this.strokeStyle;
 
-    if(this.eimg != null) {
-      this.context.drawImage(this.eimg, 0, 0, 20, 20);
+    if(currentUserImage) {
+      this.context.drawImage(currentUserImage, 0, 0, 20, 20);
     }
 
     this.context.stroke();
