@@ -65,10 +65,10 @@ var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
 var firebaseRefGame = firebaseRef.child('game');
 var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
 
-// User login
 var currentUser = null;
-var currentUserImage = null;
+var currentUserCachedImage = null;
 
+// User login
 firebaseRef.onAuth(function(authData) {
   if(authData) {
     // User logged in
@@ -76,18 +76,28 @@ firebaseRef.onAuth(function(authData) {
       uid: authData.uid,
       type: authData.provider,
       name: "Guest " + Math.floor(10000 * Math.random()),
-      photo: null
+      imageUrl: null
     };
     if(authData.provider == "twitter") {
       currentUser.name = authData.twitter.username;
-      currentUser.photo =  authData.twitter.cachedUserProfile.profile_image_url_https;
-      currentUserImage = new Image();
-      currentUserImage.src = currentUser.photo;
+      currentUser.imageUrl =  authData.twitter.cachedUserProfile.profile_image_url_https;
+
+      // Cache the user image so we don't need to do this processing for every draw loop
+      currentUserCachedImage = new Image();
+      currentUserCachedImage.src = currentUser.imageUrl;
     }
   } else {
     // User logged out
     currentUser = null;
+    
+    // If they're not authenticated, auth them anonymously
+    firebaseRef.authAnonymously(function(error, authData) {
+      if (error) {
+        console.log("Anonymous login Failed!", error);
+      }
+    });
   }
+  
   updateDisplayName(currentUser);
 });
 
@@ -95,13 +105,14 @@ function updateDisplayName(currentUser) {
   if(currentUser) {
     if(currentUser.type == "twitter") {
       $('#login').hide();
-      $('#my-name').html('<img height=24 src="' + currentUser.photo + '"> @' + currentUser.name);
+      $('#my-name').html('<img height=24 src="' + currentUser.imageUrl + '"> @' + currentUser.name);
     } else {
       $('#login').show();
       $('#my-name').text(currentUser.name);
     }
   }
 }
+
 
 // Handle login UI
 $(document).ready(function() {
@@ -117,14 +128,6 @@ $(document).ready(function() {
       }
     });
   });
-
-  if(currentUser == null) {
-    firebaseRef.authAnonymously(function(error, authData) {
-      if (error) {
-        console.log("Anonymous login Failed!", error);
-      }
-    });
-  }
 });
 
 
@@ -165,7 +168,9 @@ function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	var newScoreRow = $("<tr/>");
 	var postedScore = scoreSnapshot.val();
 	if(postedScore.user.type == 'twitter') {
-	  newScoreRow.append($("<td/>").append('<img height=24 src="' + postedScore.user.photo + '">').append($("<strong/>").text('@' + postedScore.user.name)));
+	  newScoreRow.append($("<td/>")
+        .append('<img class="leaderboardImage" src="' + postedScore.user.imageUrl + '">')
+        .append($("<strong/>").text('@' + postedScore.user.name)));
 	  newScoreRow.append($("<td/>").text(postedScore.score));
 	} else {
 	  newScoreRow.append($("<td/>").append($("<strong/>").text(postedScore.user.name)));
@@ -178,7 +183,12 @@ function handleScoreAdded(scoreSnapshot, lowerScoreName) {
 	// Insert the new score in the appropriate place in the GUI.
 	if (lowerScoreName === null) {
 		$("#leaderboardTable").append(newScoreRow);
-	} else {
+    
+    // If the Twitter account is gone, remove the broken photo
+    $(".leaderboardImage").error(function () {
+      $(this).remove();
+    });
+  } else {
 		var lowerScoreRow = htmlForPath[lowerScoreName];
 		lowerScoreRow.before(newScoreRow);
 	}
@@ -462,8 +472,6 @@ Sprite = function () {
     for (var i = 0; i < count; i++) {
       px = trans[i*2];
       py = trans[i*2 + 1];
-      // mozilla doesn't take into account transforms with isPointInPath >:-P
-      //TODO: fix ->($.browser.mozilla) ? this.pointInPolygon(px, py) : this.context.isPointInPath(px, py)
       if (this.context.isPointInPath(px, py)) {
         other.collision(this);
         this.collision(other);
@@ -615,7 +623,7 @@ Ship = function () {
     }
 
     // Write new ship location to Firebase on each key frame
-    if ((this.vel.rot != this.previousKeyFrame.vel.rot) || (KEY_STATUS.up != this.previousKeyFrame.accb)) {
+    if ((this.vel.rot !== this.previousKeyFrame.vel.rot) || (KEY_STATUS.up !== this.previousKeyFrame.accb)) {
       myship.set({
         ship: {
           acc: this.acc,
@@ -670,7 +678,7 @@ Ship = function () {
 
     this.context.lineWidth = 1.5 / this.scale;
 
-    for (child in this.children) {
+    for (var child in this.children) {
       this.children[child].draw();
     }
 
@@ -686,8 +694,8 @@ Ship = function () {
     this.context.closePath();
     this.context.strokeStyle = this.strokeStyle;
 
-    if(currentUserImage) {
-      this.context.drawImage(currentUserImage, 0, 0, 20, 20);
+    if(currentUserCachedImage) {
+      this.context.drawImage(currentUserCachedImage, 0, 0, 20, 20);
     }
 
     this.context.stroke();
@@ -1117,7 +1125,7 @@ Game = {
         this.timer = null;
         this.state = 'start';
         var postScoreRef = scoreListRef.push();
-        postScoreRef.setWithPriority({user: currentUser, score: Game.score}, Game.score);
+        postScoreRef.set({user: currentUser, score: Game.score}, Game.score);
       }
 
       window.gameStart = false;
@@ -1250,12 +1258,12 @@ $(function () {
     delta = elapsed / 30;
 
     var i = 0;
-    for (var sprite in sprites) {
-      var s = sprites[sprite];
-      if(typeof(s) != undefined) {
-        s.run(delta);
-        if (s.reap) {
-          s.reap = false;
+    for (var j in sprites) {
+      var sprite = sprites[j];
+      if(typeof(sprite) != undefined) {
+        sprite.run(delta);
+        if (sprite.reap) {
+          sprite.reap = false;
           sprites.splice(i, 1);
           i--;
         }
@@ -1285,9 +1293,9 @@ $(function () {
   };
 
   // Presence
-  var cb = firebaseRef.child('.info/connected').on('value', function(snap) {
+  var connectedRef = firebaseRef.child('.info/connected').on('value', function(snap) {
     if (snap.val()) {
-      firebaseRef.child('.info/connected').off('value', cb);
+      firebaseRef.child('.info/connected').off('value', connectedRef);
       mainLoop();
     }
   });  
@@ -1295,7 +1303,7 @@ $(function () {
 
   // Sync enemy ships from Firebase to local game state
   firebaseRefGame.child('players').on('child_added', function (snapshot) {
-    if (snapshot.key() != myship.key()) {
+    if (snapshot.key() !== myship.key()) {
       var enemy = new EnemyShip();
       enemy.acc = snapshot.val().ship.acc;
       enemy.vel = snapshot.val().ship.vel;
@@ -1306,9 +1314,9 @@ $(function () {
       enemy.visible = true;
       enemy.user = snapshot.val().user;
       enemy.fref = firebaseRefGame.child('players').child(snapshot.key());
-      if (typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+      if (typeof(enemy.user.imageUrl) != undefined && enemy.user.imageUrl != null) {
         enemy.eimg = new Image();
-        enemy.eimg.src = enemy.user.photo;
+        enemy.eimg.src = enemy.user.imageUrl;
       } else {
         enemy.eimg = null;
       }
@@ -1318,7 +1326,7 @@ $(function () {
   });
 
   firebaseRefGame.child('players').on('child_changed', function (snapshot) {
-    if (snapshot.key() != myship.key()) {
+    if (snapshot.key() !== myship.key()) {
       var enemy = Game.sprites[snapshot.key()];
       enemy.visible = true;
       enemy.acc = snapshot.val().ship.acc;
@@ -1329,9 +1337,9 @@ $(function () {
       enemy.accb = snapshot.val().ship.accb;
       enemy.user = snapshot.val().user;
       enemy.fref = firebaseRefGame.child('players').child(snapshot.key());
-      if (typeof(enemy.user.photo) != undefined && enemy.user.photo != null) {
+      if (typeof(enemy.user.imageUrl) != undefined && enemy.user.imageUrl != null) {
         enemy.eimg = new Image();
-        enemy.eimg.src = enemy.user.photo;
+        enemy.eimg.src = enemy.user.imageUrl;
       } else {
         enemy.eimg = null;
       }
@@ -1340,7 +1348,7 @@ $(function () {
   });
 
   firebaseRefGame.child('players').on('child_removed', function (snapshot) {
-    if (snapshot.key() != myship.key()) {
+    if (snapshot.key() !== myship.key()) {
       var enemy = Game.sprites[snapshot.key()];
       enemy.visible = false;
       delete Game.sprites[snapshot.key()];
@@ -1354,7 +1362,7 @@ $(function () {
   // Sync enemy bullets from Firebase to local game state
   firebaseRefGame.child('bullets').on('child_added', function (snapshot) {
     var bullet = snapshot.val();
-    if (bullet.s != myship.key()) {
+    if (bullet.s !== myship.key()) {
       var enemybullet = new EnemyBullet();
       enemybullet.x = bullet.x;
       enemybullet.y = bullet.y;
@@ -1367,7 +1375,7 @@ $(function () {
 
   firebaseRefGame.child('bullets').on('child_removed', function (snapshot) {
     var bullet = snapshot.val();
-    if (bullet.s != myship.key()) {
+    if (bullet.s !== myship.key()) {
       var enemybullet = Game.sprites['bullet:' + snapshot.key()];
       if (enemybullet != null) {
         enemybullet.visible = false;

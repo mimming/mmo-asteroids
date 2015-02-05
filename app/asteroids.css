@@ -75,6 +75,11 @@ A:hover {text-decoration: underline; color: white;}
   color: #c0c0c0;
 }
 
+.leaderboardImage {
+  height: 24px;
+  margin-right: 5px;
+}
+
 #canvas {
   position:relative;
   border: 8px solid #424547;
@@ -91,7 +96,7 @@ A:hover {text-decoration: underline; color: white;}
 #left-controls {
   position:absolute;
   left:1px;
-  bottom:0px;
+  bottom:0;
   display:none;
 }
 
