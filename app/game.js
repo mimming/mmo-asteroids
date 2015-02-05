@@ -1125,7 +1125,7 @@ Game = {
         this.timer = null;
         this.state = 'start';
         var postScoreRef = scoreListRef.push();
-        postScoreRef.set({user: currentUser, score: Game.score}, Game.score);
+        postScoreRef.set({user: currentUser, score: Game.score});
       }
 
       window.gameStart = false;
