@@ -1,10 +1,12 @@
-# HTML5-Asteroids
+# MMO Asteroids
 
-Pure Javascript Multiplayer Asteroids.
+Pure JavaScript Multiplayer Asteroids. Powered by [Firebase](https://firebase.com).
 
-## Multiplayer powered by Firebase
+## Wat
 
-Based on the original version by @dmcinnes, we added some Firebase love and made it multiplayer!  And, along the way... eh, actually, removed the asteroids. You get the point :)
+![Preview](preview.gif)
+
+Based on the [original version](https://github.com/dmcinnes/HTML5-Asteroids) by @dmcinnes, we added some Firebase love and made it multiplayer!  And, along the way... eh, actually, removed the asteroids. You get the point :)
 
 [Live Demo](https://mmoasteroids.firebaseapp.com/)
 
