@@ -20,19 +20,10 @@
  THE SOFTWARE.
  */
 
+console.log("Hello! I'm the asteroids bot. I'm going to spawn someone for you to play against.");
+
 var Firebase = require("firebase");
-
 // Constants
-
-// Keys
-var KEY_CODES = {
-  32: 'space',
-  37: 'left',
-  38: 'up',
-  39: 'right',
-  40: 'down',
-  71: 'g'
-};
 
 // Gameplay constants
 var SHIP_MAX_SPEED = 8;
@@ -42,12 +33,10 @@ var BULLET_DELAY = 10;
 var BULLET_MAX_COUNT = 10;
 var BULLET_LIFETIME = 50;
 
-var STARTING_LIVES = 4;
-
-
-// UI constants
+// Game field constants
 var CANVAS_WIDTH = 1000;
 var CANVAS_HEIGHT = 700;
+
 /**
  * The grid sized, used to speed up collision maths.
  * Too small = missed collisions
@@ -55,29 +44,25 @@ var CANVAS_HEIGHT = 700;
  */
 var GRID_SIZE = 60;
 
-// Firebase connection Stuff
+// Firebase connection stuff
 var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
 var firebaseRefGame = firebaseRef.child('game');
-var firebaseRefLeaderboard = firebaseRef.child('leaderboard');
 
-var currentUser = null;
+var currentUser = {
+  imageUrl: "https://mmoasteroids.firebaseapp.com/assets/robot.png",
+  name: "Bot " + Math.floor(10000 * Math.random()),
+};
 
 // User login
-firebaseRef.onAuth(function(authData) {
-  if(authData) {
+firebaseRef.onAuth(function (authData) {
+  if (authData) {
     // Create a new bot user
-    currentUser = {
-      uid: authData.uid,
-      type: authData.provider,
-      name: "Bot " + Math.floor(10000 * Math.random()),
-      imageUrl: null
-    };
+    currentUser.uid = authData.uid;
+    currentUser.provider = authData.provider;
+        
   } else {
-    // User logged out
-    currentUser = null;
-
     // If they're not authenticated, auth them anonymously
-    firebaseRef.authAnonymously(function(error, authData) {
+    firebaseRef.authAnonymously(function (error, authData) {
       if (error) {
         console.log("Anonymous login Failed!", error);
       }
@@ -85,55 +70,13 @@ firebaseRef.onAuth(function(authData) {
   }
 });
 
-
-// Init the key event stuff
-var KEY_STATUS = { keyDown: false };
-for (var code in KEY_CODES) {
-  KEY_STATUS[KEY_CODES[code]] = false;
-}
-
-var KEY_STATUS = { keyDown: true };
-for (var code in KEY_CODES) {
-  KEY_STATUS[KEY_CODES[code]] = false;
-}
-KEY_STATUS[KEY_CODES[32]] = true;
-
-//// Capture key events
-//$(window).keydown(function (event) {
-//  KEY_STATUS.keyDown = true;
-//  if (KEY_CODES[event.keyCode]) {
-//    event.preventDefault();
-//    KEY_STATUS[KEY_CODES[event.keyCode]] = true;
-//  }
-//}).keyup(function (event) {
-//  KEY_STATUS.keyDown = false;
-//  if (KEY_CODES[event.keyCode]) {
-//    event.preventDefault();
-//    KEY_STATUS[KEY_CODES[event.keyCode]] = false;
-//  }
-//});
-
 // Add player's ship to Firebase
 var myship = firebaseRefGame.child('players').push();
 
 // Schedule player removal on disconnect
 myship.onDisconnect().remove();
 
-// Leaderboard stuff
-
-// Handle the leaderboard
-var scoreListRef = firebaseRefLeaderboard.child('scoreList');
-
-function setScore(score) {
-  Game.score = score;
-}
-
-function deltaScore(score) {
-  Game.score += score;
-}
-
 // Rendering stuff
-
 Matrix = function (rows, columns) {
   var i, j;
   this.data = new Array(rows);
@@ -142,11 +85,11 @@ Matrix = function (rows, columns) {
   }
 
   this.configure = function (rot, scale, transx, transy) {
-    var rad = (rot * Math.PI)/180;
+    var rad = (rot * Math.PI) / 180;
     var sin = Math.sin(rad) * scale;
     var cos = Math.cos(rad) * scale;
     this.set(cos, -sin, transx,
-        sin,  cos, transy);
+        sin, cos, transy);
   };
 
   this.set = function () {
@@ -178,77 +121,62 @@ Matrix = function (rows, columns) {
  */
 Sprite = function () {
   this.init = function (name, points) {
-    this.name     = name;
-    this.points   = points;
+    this.name = name;
+    this.points = points;
 
     this.vel = {
-      x:   0,
-      y:   0,
+      x: 0,
+      y: 0,
       rot: 0
     };
 
     this.acc = {
-      x:   0,
-      y:   0,
+      x: 0,
+      y: 0,
       rot: 0
     };
   };
 
   this.children = {};
 
-  this.visible  = false;
-  this.reap     = false;
+  this.visible = false;
+  this.reap = false;
   this.bridgesH = true;
   this.bridgesV = true;
 
   this.collidesWith = [];
 
-  this.x     = 0;
-  this.y     = 0;
-  this.rot   = 0;
+  this.x = 0;
+  this.y = 0;
+  this.rot = 0;
   this.scale = 1;
 
   this.currentNode = null;
-  this.nextSprite  = null;
+  this.nextSprite = null;
 
-//  this.preMove  = null;
-//  this.postMove = null;
   this.strokeStyle = "#000000";
 
-  this.run = function(delta) {
+  this.run = function (delta) {
 
     this.move(delta);
     this.updateGrid();
 
-//    this.context.save();
-    this.configureTransform();
-//    this.draw();
 
     var canidates = this.findCollisionCanidates();
 
     this.matrix.configure(this.rot, this.scale, this.x, this.y);
     this.checkCollisionsAgainst(canidates);
 
-//    this.context.restore();
-
     if (this.bridgesH && this.currentNode && this.currentNode.dupe.horizontal) {
       this.x += this.currentNode.dupe.horizontal;
-//      this.context.save();
-      this.configureTransform();
-//      this.draw();
       this.checkCollisionsAgainst(canidates);
-//      this.context.restore();
       if (this.currentNode) {
         this.x -= this.currentNode.dupe.horizontal;
       }
     }
     if (this.bridgesV && this.currentNode && this.currentNode.dupe.vertical) {
       this.y += this.currentNode.dupe.vertical;
-//      this.context.save();
-      this.configureTransform();
-//      this.draw();
       this.checkCollisionsAgainst(canidates);
-//      this.context.restore();
       if (this.currentNode) {
         this.y -= this.currentNode.dupe.vertical;
       }
@@ -259,11 +187,7 @@ Sprite = function () {
         this.currentNode.dupe.horizontal) {
       this.x += this.currentNode.dupe.horizontal;
       this.y += this.currentNode.dupe.vertical;
-//      this.context.save();
-      this.configureTransform();
-//      this.draw();
       this.checkCollisionsAgainst(canidates);
-//      this.context.restore();
       if (this.currentNode) {
         this.x -= this.currentNode.dupe.horizontal;
         this.y -= this.currentNode.dupe.vertical;
@@ -274,9 +198,7 @@ Sprite = function () {
     if (!this.visible) return;
     this.transPoints = null; // clear cached points
 
-//    if ($.isFunction(this.preMove)) {
-      this.preMove(delta);
-//    }
+    this.preMove(delta);
 
     this.vel.x += this.acc.x * delta;
     this.vel.y += this.acc.y * delta;
@@ -289,18 +211,25 @@ Sprite = function () {
       this.rot += 360;
     }
 
-//    if ($.isFunction(this.postMove)) {
-      this.postMove(delta);
-//    }
+    this.postMove(delta);
   };
+  
+  this.preMove = function () {
+    //noop
+  };
+
+  this.postMove = function () {
+    //noop
+  };
+
   this.updateGrid = function () {
     if (!this.visible) return;
     var gridx = Math.floor(this.x / GRID_SIZE);
     var gridy = Math.floor(this.y / GRID_SIZE);
     gridx = (gridx >= this.grid.length) ? 0 : gridx;
     gridy = (gridy >= this.grid[0].length) ? 0 : gridy;
-    gridx = (gridx < 0) ? this.grid.length-1 : gridx;
-    gridy = (gridy < 0) ? this.grid[0].length-1 : gridy;
+    gridx = (gridx < 0) ? this.grid.length - 1 : gridx;
+    gridy = (gridy < 0) ? this.grid[0].length - 1 : gridy;
     var newNode = this.grid[gridx][gridy];
     if (newNode != this.currentNode) {
       if (this.currentNode) {
@@ -310,50 +239,8 @@ Sprite = function () {
       this.currentNode = newNode;
     }
 
-//    if (KEY_STATUS.g && this.currentNode) {
-//      this.context.lineWidth = 3.0;
-//      this.context.strokeStyle = 'green';
-//      this.context.strokeRect(gridx*GRID_SIZE+2, gridy*GRID_SIZE+2, GRID_SIZE-4, GRID_SIZE-4);
-//      this.context.strokeStyle = 'black';
-//      this.context.lineWidth = 1.0;
-//    }
   };
-  this.configureTransform = function () {
-    if (!this.visible) return;
 
-    var rad = (this.rot * Math.PI) / 180;
-
-//    this.context.translate(this.x, this.y);
-//    this.context.rotate(rad);
-//    this.context.scale(this.scale, this.scale);
-  };
-//  this.draw = function () {
-//    if (!this.visible) return;
-//
-//    this.context.lineWidth = 1.5 / this.scale;
-//
-//    for (child in this.children) {
-//      this.children[child].draw();
-//    }
-//
-//    this.context.beginPath();
-//
-//    this.context.moveTo(this.points[0], this.points[1]);
-//    for (var i = 1; i < this.points.length/2; i++) {
-//      var xi = i*2;
-//      var yi = xi + 1;
-//      this.context.lineTo(this.points[xi], this.points[yi]);
-//    }
-//
-//    this.context.closePath();
-//    this.context.strokeStyle = this.strokeStyle;
-//
-//    if(this.eimg != null) {
-//      this.context.drawImage(this.eimg, 0, 0, 20, 20);
-//    }
-//
-//    this.context.stroke();
-//  };
   this.findCollisionCanidates = function () {
     if (!this.visible || !this.currentNode) return [];
     var cn = this.currentNode;
@@ -382,19 +269,42 @@ Sprite = function () {
     if (!other.visible ||
         this == other ||
         this.collidesWith.indexOf(other.name) == -1) return;
-    //TODO: might need to reimplement isPointInPath
-//    var trans = other.transformedPoints();
-//    var px, py;
-//    var count = trans.length/2;
-//    for (var i = 0; i < count; i++) {
-//      px = trans[i*2];
-//      py = trans[i*2 + 1];
-//      if (this.context.isPointInPath(px, py)) {
-//        other.collision(this);
-//        this.collision(other);
-//        return;
-//      }
-//    }
+
+    var trans = other.transformedPoints();
+    var px, py;
+    var rawPoly = this.transformedPoints();
+    var thisPoly = [];
+    
+    for(var g = 0; g < rawPoly.length/2; g++) {
+      var thisPolyPoint = [];
+      thisPolyPoint[0] = rawPoly[g*2];
+      thisPolyPoint[1] = rawPoly[g*2+1];
+
+      thisPoly[g] = thisPolyPoint;
+    }
+    
+    for (var g = 0; g < trans.length/2; g++) {
+      px = trans[g*2];
+      py = trans[g*2 + 1];
+
+      var inside = false;
+      for (var i = 0, j = thisPoly.length - 1; i < thisPoly.length; j = i++) {
+        var xi = thisPoly[i][0], yi = thisPoly[i][1];
+        var xj = thisPoly[j][0], yj = thisPoly[j][1];
+
+        var intersect = ((yi > py) != (yj > py))
+            && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      
+      if(inside) {
+        console.log("collision detected");
+
+        other.collision(this);
+        this.collision(other);
+        return;
+      }
+    }
   };
   this.collision = function () {
   };
@@ -406,12 +316,13 @@ Sprite = function () {
       this.currentNode = null;
     }
   };
+  
   this.transformedPoints = function () {
     if (this.transPoints) return this.transPoints;
     var trans = new Array(this.points.length);
     this.matrix.configure(this.rot, this.scale, this.x, this.y);
-    for (var i = 0; i < this.points.length/2; i++) {
-      var xi = i*2;
+    for (var i = 0; i < this.points.length / 2; i++) {
+      var xi = i * 2;
       var yi = xi + 1;
       var pts = this.matrix.multiply(this.points[xi], this.points[yi], 1);
       trans[xi] = pts[0];
@@ -420,6 +331,7 @@ Sprite = function () {
     this.transPoints = trans; // cache translated points
     return trans;
   };
+  
   this.isClear = function () {
     if (this.collidesWith.length == 0) return true;
     var cn = this.currentNode;
@@ -452,13 +364,6 @@ Sprite = function () {
       this.y = Game.canvasHeight;
     }
   };
-  this.preMove = function() {
-    console.log("premove");
-  };
-  
-  this.postMove = function() {
-    console.log("postmove");
-  };
 };
 
 /**
@@ -466,18 +371,20 @@ Sprite = function () {
  */
 Ship = function () {
   this.init("ship",
-      [-5,   4,
+      [-5, 4,
         0, -12,
-        5,   4]);
+        5, 4]);
 
   this.scale = 1.5;
   this.children.exhaust = new Sprite();
   this.children.exhaust.strokeStyle = "#ff0000";
   this.children.exhaust.init("exhaust",
-      [-3,  6,
+      [-3, 6,
         0, 11,
-        3,  6]);
+        3, 6]);
 
+  
+  this.visible = true;
   this.bulletCounter = 0;
   this.strokeStyle = "#ffff00";
   this.keyFrame = 0;
@@ -489,18 +396,23 @@ Ship = function () {
   this.previousKeyFrame = { vel: { rot: 0 }, accb: false };
 
   this.preMove = function (delta) {
-    if (KEY_STATUS.left) {
+    // TODO: Decide what to do next
+    var nextMove = {
+      left: false,
+      right: false,
+      up: true,
+      space: false
+    };
+    
+    if (nextMove.left) {
       this.vel.rot = -SHIP_ROTATION_RATE;
-    } else if (KEY_STATUS.right) {
+    } else if (nextMove.right) {
       this.vel.rot = SHIP_ROTATION_RATE;
     } else {
-//      this.vel.rot = 0;
-      //TODO: make it not always spin
-      this.vel.rot = SHIP_ROTATION_RATE;
-
+      this.vel.rot = 0;
     }
 
-    if (KEY_STATUS.up) {
+    if (nextMove.up) {
       var keyUpRad = ((this.rot - 90) * Math.PI) / 180;
       this.acc.x = 0.5 * Math.cos(keyUpRad);
       this.acc.y = 0.5 * Math.sin(keyUpRad);
@@ -514,11 +426,8 @@ Ship = function () {
     if (this.bulletCounter > 0) {
       this.bulletCounter -= delta;
     }
-    
-    // hard code always firing
-    //TODO: replace with something good
-    if(true) {
-//    if (KEY_STATUS.space) {
+
+    if (nextMove.space) {
       if (this.bulletCounter <= 0) {
         this.bulletCounter = BULLET_DELAY;
         for (var i = 0; i < this.bullets.length; i++) {
@@ -553,7 +462,7 @@ Ship = function () {
     }
 
     // Write new ship location to Firebase on each key frame
-    if ((this.vel.rot !== this.previousKeyFrame.vel.rot) || (KEY_STATUS.up !== this.previousKeyFrame.accb)) {
+    if ((this.vel.rot !== this.previousKeyFrame.vel.rot) || (nextMove.up !== this.previousKeyFrame.accb)) {
       myship.set({
         ship: {
           acc: this.acc,
@@ -561,12 +470,12 @@ Ship = function () {
           x: this.x,
           y: this.y,
           rot: this.rot,
-          accb: KEY_STATUS.up
+          accb: nextMove.up
         },
         user: currentUser
       });
     }
-    this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: KEY_STATUS.up };
+    this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: nextMove.up };
 
     // Write new ship location to Firebase about every 60 frames
     this.keyFrame++;
@@ -578,7 +487,7 @@ Ship = function () {
           x: this.x,
           y: this.y,
           rot: this.rot,
-          accb: KEY_STATUS.up
+          accb: nextMove.up
         },
         user: currentUser
       });
@@ -586,51 +495,23 @@ Ship = function () {
   };
 
   this.collision = function (other) {
-    if(other != null) {
+    if (other != null) {
       Game.explosionAt(other.x, other.y);
     }
     else {
       Game.explosionAt(Game.ship.x, Game.ship.y);
     }
     Game.FSM.state = 'player_died';
+    console.log("Bot died :(");
+
     this.visible = false;
-    if(this.currentNode != null) {
+    if (this.currentNode != null) {
       this.currentNode.leave(this);
     }
     this.currentNode = null;
-    Game.lives--;
-    if (other != null && other.name == "enemyship")
-      deltaScore(Math.floor(100 * Math.random()));
   };
-
-//  this.draw = function () {
-//    if (!this.visible) return;
-//
-//    this.context.lineWidth = 1.5 / this.scale;
-//
-//    for (var child in this.children) {
-//      this.children[child].draw();
-//    }
-//
-//    this.context.beginPath();
-//
-//    this.context.moveTo(this.points[0], this.points[1]);
-//    for (var i = 1; i < this.points.length/2; i++) {
-//      var xi = i*2;
-//      var yi = xi + 1;
-//      this.context.lineTo(this.points[xi], this.points[yi]);
-//    }
-//
-//    this.context.closePath();
-//    this.context.strokeStyle = this.strokeStyle;
-//
-//    if(currentUserCachedImage) {
-//      this.context.drawImage(currentUserCachedImage, 0, 0, 20, 20);
-//    }
-//
-//    this.context.stroke();
-//  };
 };
+
 Ship.prototype = new Sprite();
 
 /**
@@ -638,16 +519,16 @@ Ship.prototype = new Sprite();
  */
 EnemyShip = function () {
   this.init("enemyship",
-      [-5,   4,
+      [-5, 4,
         0, -12,
-        5,   4]);
+        5, 4]);
 
   this.children.exhaust = new Sprite();
   this.children.exhaust.strokeStyle = "#ff0000";
   this.children.exhaust.init("exhaust",
-      [-3,  6,
+      [-3, 6,
         0, 11,
-        3,  6]);
+        3, 6]);
 
   this.scale = 1.5;
   this.bulletCounter = 0;
@@ -656,32 +537,6 @@ EnemyShip = function () {
   this.postMove = this.wrapPostMove;
   this.collidesWith = ["bullet"];
 
-//  this.draw = function () {
-//    if (!this.visible) return;
-//
-//    this.context.lineWidth = 1.5 / this.scale;
-//
-//    for (var child in this.children) {
-//      this.children[child].draw();
-//    }
-//
-//    this.context.beginPath();
-//
-//    this.context.moveTo(this.points[0], this.points[1]);
-//    for (var i = 1; i < this.points.length/2; i++) {
-//      var xi = i*2;
-//      var yi = xi + 1;
-//      this.context.lineTo(this.points[xi], this.points[yi]);
-//    }
-//
-//    this.context.closePath();
-//    this.context.strokeStyle = this.strokeStyle;
-//    if(this.eimg != null) {
-//      this.context.drawImage(this.eimg, 0, 0, 20, 20);
-//    }
-//    this.context.stroke();
-//  };
-
   this.preMove = function (delta) {
     // limit the ship's speed
     if (Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y) > SHIP_MAX_SPEED) {
@@ -689,8 +544,8 @@ EnemyShip = function () {
       this.vel.y *= 0.95;
     }
 
-    if(this.accb) {
-      var rad = ((this.rot-90) * Math.PI)/180;
+    if (this.accb) {
+      var rad = ((this.rot - 90) * Math.PI) / 180;
       this.acc.x = 0.5 * Math.cos(rad);
       this.acc.y = 0.5 * Math.sin(rad);
       this.children.exhaust.visible = Math.random() > 0.1;
@@ -723,21 +578,9 @@ Bullet = function () {
   this.bridgesV = false;
   this.postMove = this.wrapPostMove;
 
-  this.configureTransform = function () {};
-//  this.draw = function () {
-//    if (this.visible) {
-//      this.context.save();
-//      this.context.lineWidth = 2;
-//      this.context.beginPath();
-//      this.context.moveTo(this.x-1, this.y-1);
-//      this.context.lineTo(this.x+1, this.y+1);
-//      this.context.moveTo(this.x+1, this.y-1);
-//      this.context.lineTo(this.x-1, this.y+1);
-//      this.context.strokeStyle = "#ffffff";
-//      this.context.stroke();
-//      this.context.restore();
-//    }
-//  };
+  this.configureTransform = function () {
+  };
+
   this.preMove = function (delta) {
     if (this.visible) {
       this.time += delta;
@@ -754,7 +597,6 @@ Bullet = function () {
     this.fref.remove();
     this.currentNode.leave(this);
     this.currentNode = null;
-    if (other.name == "enemyship") deltaScore(100);
   };
   this.transformedPoints = function (other) {
     return [this.x, this.y];
@@ -770,21 +612,9 @@ EnemyBullet = function () {
   this.bridgesV = false;
   this.postMove = this.wrapPostMove;
 
-  this.configureTransform = function () {};
-//  this.draw = function () {
-//    if (this.visible) {
-//      this.context.save();
-//      this.context.lineWidth = 2;
-//      this.context.beginPath();
-//      this.context.moveTo(this.x-1, this.y-1);
-//      this.context.lineTo(this.x+1, this.y+1);
-//      this.context.moveTo(this.x+1, this.y-1);
-//      this.context.lineTo(this.x-1, this.y+1);
-//      this.context.strokeStyle = "#ff0000";
-//      this.context.stroke();
-//      this.context.restore();
-//    }
-//  };
+  this.configureTransform = function () {
+  };
+
   this.preMove = function (delta) {
     if (this.visible) {
       this.time += delta;
@@ -819,24 +649,8 @@ Explosion = function () {
     var rad = 2 * Math.PI * Math.random();
     var x = Math.cos(rad);
     var y = Math.sin(rad);
-    this.lines.push([x, y, x*2, y*2]);
+    this.lines.push([x, y, x * 2, y * 2]);
   }
-
-//  this.draw = function () {
-//    if (this.visible) {
-//      this.context.save();
-//      this.context.lineWidth = 1.0 / this.scale;
-//      this.context.beginPath();
-//      for (var i = 0; i < 5; i++) {
-//        var line = this.lines[i];
-//        this.context.moveTo(line[0], line[1]);
-//        this.context.lineTo(line[2], line[3]);
-//      }
-//      this.context.strokeStyle = "#CC3232";
-//      this.context.stroke();
-//      this.context.restore();
-//    }
-//  };
 
   this.preMove = function (delta) {
     if (this.visible) {
@@ -901,88 +715,11 @@ GridNode = function () {
   };
 };
 
-// borrowed from typeface-0.14.js
-// http://typeface.neocracy.org
-Text = {
-  renderGlyph: function (ctx, face, char) {
-    this.context.strokeStyle = "#FFFFFF";
-    this.context.fillStyle = "#FFFFFF";
-
-    var glyph = face.glyphs[char];
-
-    if (glyph.o) {
-
-      var outline;
-      if (glyph.cached_outline) {
-        outline = glyph.cached_outline;
-      } else {
-        outline = glyph.o.split(' ');
-        glyph.cached_outline = outline;
-      }
-
-      var outlineLength = outline.length;
-      for (var i = 0; i < outlineLength; ) {
-
-        var action = outline[i++];
-
-        switch(action) {
-          case 'm':
-            ctx.moveTo(outline[i++], outline[i++]);
-            break;
-          case 'l':
-            ctx.lineTo(outline[i++], outline[i++]);
-            break;
-
-          case 'q':
-            var cpx = outline[i++];
-            var cpy = outline[i++];
-            ctx.quadraticCurveTo(outline[i++], outline[i++], cpx, cpy);
-            break;
-
-          case 'b':
-            var x = outline[i++];
-            var y = outline[i++];
-            ctx.bezierCurveTo(outline[i++], outline[i++], outline[i++], outline[i++], x, y);
-            break;
-        }
-      }
-    }
-    if (glyph.ha) {
-      ctx.translate(glyph.ha, 0);
-    }
-  },
-
-//  renderText: function(text, size, x, y) {
-//    this.context.save();
-//
-//    this.context.translate(x, y);
-//
-//    var pixels = size * 72 / (this.face.resolution * 100);
-//    this.context.scale(pixels, -1 * pixels);
-//    this.context.beginPath();
-//    var chars = text.split('');
-//    var charsLength = chars.length;
-//    this.context.strokeStyle = "#FFFFFF";
-//    this.context.fillStyle = "#FFFFFF";
-//    for (var i = 0; i < charsLength; i++) {
-//      this.renderGlyph(this.context, this.face, chars[i]);
-//    }
-//    this.context.fill();
-//
-//    this.context.restore();
-//  },
-
-  context: null,
-  face: null
-};
 
 /**
  * The game mechanics and main loop
  */
 Game = {
-  score: 0,
-  lives: 0,
-
   canvasWidth: CANVAS_WIDTH,
   canvasHeight: CANVAS_HEIGHT,
 
@@ -1000,8 +737,7 @@ Game = {
   // Finite state machine of game progression
   FSM: {
     boot: function () {
-      KEY_STATUS.space = false; // hack so we don't shoot right away
-//      window.gameStart = false;
+//      KEY_STATUS.space = false; // hack so we don't shoot right away
       this.state = 'start';
     },
     start: function () {
@@ -1013,12 +749,10 @@ Game = {
         }
       }
 
-      setScore(0);
-      Game.lives = STARTING_LIVES;
-
       this.state = 'spawn_ship';
     },
     spawn_ship: function () {
+      console.log("Spawning a new ship");
       Game.ship.x = Math.floor(Game.canvasWidth * Math.random());
       Game.ship.y = Math.floor(Game.canvasHeight * Math.random());
       if (Game.ship.isClear()) {
@@ -1029,36 +763,19 @@ Game = {
         this.state = 'run';
       }
     },
-    run: function () { 
+    run: function () {
     },
     player_died: function () {
-      if (Game.lives < 0) {
-        this.state = 'end_game';
-      } else {
-        if (this.timer == null) {
-          this.timer = Date.now();
-        }
-        // wait a second before spawning
-        if (Date.now() - this.timer > 1000) {
-          this.timer = null;
-          this.state = 'spawn_ship';
-        }
-      }
-    },
-    end_game: function () {
-//      Text.renderText('GAME OVER RESTARTING...', 50, 30, Game.canvasHeight/2 + 10);
+
       if (this.timer == null) {
         this.timer = Date.now();
       }
-      // wait 5 seconds then go back to start state
-      if (Date.now() - this.timer > 5000) {
+      // wait a second before spawning
+      if (Date.now() - this.timer > 1000) {
         this.timer = null;
-        this.state = 'start';
-        var postScoreRef = scoreListRef.push();
-        postScoreRef.set({user: currentUser, score: Game.score});
+        this.state = 'spawn_ship';
       }
 
-//      window.gameStart = false;
     },
     execute: function () {
       this[this.state]();
@@ -1069,13 +786,8 @@ Game = {
 };
 
 
-Game.canvasWidth  = CANVAS_WIDTH;
+Game.canvasWidth = CANVAS_WIDTH;
 Game.canvasHeight = CANVAS_HEIGHT;
-
-//  var context = canvas[0].getContext("2d");
-
-//  Text.context = context;
-//  Text.face = vector_battle;
 
 var gridWidth = Math.round(Game.canvasWidth / GRID_SIZE);
 var gridHeight = Math.round(Game.canvasHeight / GRID_SIZE);
@@ -1090,23 +802,23 @@ for (var i = 0; i < gridWidth; i++) {
 // set up the positional references
 for (var i = 0; i < gridWidth; i++) {
   for (var j = 0; j < gridHeight; j++) {
-    var node   = grid[i][j];
-    node.north = grid[i][(j == 0) ? gridHeight-1 : j-1];
-    node.south = grid[i][(j == gridHeight-1) ? 0 : j+1];
-    node.west  = grid[(i == 0) ? gridWidth-1 : i-1][j];
-    node.east  = grid[(i == gridWidth-1) ? 0 : i+1][j];
+    var node = grid[i][j];
+    node.north = grid[i][(j == 0) ? gridHeight - 1 : j - 1];
+    node.south = grid[i][(j == gridHeight - 1) ? 0 : j + 1];
+    node.west = grid[(i == 0) ? gridWidth - 1 : i - 1][j];
+    node.east = grid[(i == gridWidth - 1) ? 0 : i + 1][j];
   }
 }
 
 // set up borders
 for (var i = 0; i < gridWidth; i++) {
-  grid[i][0].dupe.vertical            =  Game.canvasHeight;
-  grid[i][gridHeight-1].dupe.vertical = -Game.canvasHeight;
+  grid[i][0].dupe.vertical = Game.canvasHeight;
+  grid[i][gridHeight - 1].dupe.vertical = -Game.canvasHeight;
 }
 
 for (var j = 0; j < gridHeight; j++) {
-  grid[0][j].dupe.horizontal           =  Game.canvasWidth;
-  grid[gridWidth-1][j].dupe.horizontal = -Game.canvasWidth;
+  grid[0][j].dupe.horizontal = Game.canvasWidth;
+  grid[gridWidth - 1][j].dupe.horizontal = -Game.canvasWidth;
 }
 
 var sprites = [];
@@ -1114,8 +826,8 @@ Game.sprites = sprites;
 
 // so all the sprites can use it
 //  Sprite.prototype.context = context;
-Sprite.prototype.grid    = grid;
-Sprite.prototype.matrix  = new Matrix(2, 3);
+Sprite.prototype.grid = grid;
+Sprite.prototype.matrix = new Matrix(2, 3);
 
 var ship = new Ship();
 
@@ -1144,41 +856,11 @@ var thisFrame;
 var elapsed;
 var delta;
 
-//  var canvasNode = canvas[0];
-
-// shim layer with setTimeout fallback
-// from here:
-// http://paulirish.com/2011/requestanimationframe-for-smart-animating/
-//  window.requestAnimFrame = (function () {
-//    return  window.requestAnimationFrame       ||
-//        window.webkitRequestAnimationFrame ||
-//        window.mozRequestAnimationFrame    ||
-//        window.oRequestAnimationFrame      ||
-//        window.msRequestAnimationFrame     ||
-//        function (/* function */ callback, /* DOMElement */ element) {
-//          window.setTimeout(callback, 1000 / 60);
-//        };
-//  })();
 
 var mainLoop = function () {
-//    context.clearRect(0, 0, Game.canvasWidth, Game.canvasHeight);
 
   Game.FSM.execute();
 
-//    if (KEY_STATUS.g) {
-//      context.beginPath();
-//      for (var i = 0; i < gridWidth; i++) {
-//        context.moveTo(i * GRID_SIZE, 0);
-//        context.lineTo(i * GRID_SIZE, Game.canvasHeight);
-//      }
-//      for (var j = 0; j < gridHeight; j++) {
-//        context.moveTo(0, j * GRID_SIZE);
-//        context.lineTo(Game.canvasWidth, j * GRID_SIZE);
-//      }
-//      context.closePath();
-//      context.stroke();
-//    }
-//
   thisFrame = Date.now();
   elapsed = thisFrame - lastFrame;
   lastFrame = thisFrame;
@@ -1187,7 +869,7 @@ var mainLoop = function () {
   var i = 0;
   for (var j in sprites) {
     var sprite = sprites[j];
-    if(typeof(sprite) != undefined) {
+    if (typeof(sprite) != undefined) {
       sprite.run(delta);
       if (sprite.reap) {
         sprite.reap = false;
@@ -1197,16 +879,6 @@ var mainLoop = function () {
     }
     i++;
   }
-
-  // extra lives
-//    for (i = 0; i < Game.lives; i++) {
-//      context.save();
-//      extraLife.x = Game.canvasWidth - (8 * (i + 1));
-//      extraLife.y = 16;
-//      extraLife.configureTransform();
-//      extraLife.draw();
-//      context.restore();
-//    }
 
   frameCount++;
   elapsedCounter += elapsed;
@@ -1218,11 +890,10 @@ var mainLoop = function () {
 
   // process at 60 fps
   setTimeout(mainLoop, 1000 / 60);
-//    requestAnimFrame(mainLoop, canvasNode);
 };
 
 //Presence
-var connectedRef = firebaseRef.child('.info/connected').on('value', function(snap) {
+firebaseRef.child('.info/connected').on('value', function (snap) {
   //Start the game on connect
   mainLoop();
 });
