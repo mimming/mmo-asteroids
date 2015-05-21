@@ -44,6 +44,10 @@ var CANVAS_HEIGHT = 700;
  */
 var GRID_SIZE = 60;
 
+
+// The ship this bot is targeting
+var targetShip;
+
 // Firebase connection stuff
 var firebaseRef = new Firebase("https://mmoasteroids.firebaseio.com");
 var firebaseRefGame = firebaseRef.child('game');
@@ -76,7 +80,7 @@ var myship = firebaseRefGame.child('players').push();
 // Schedule player removal on disconnect
 myship.onDisconnect().remove();
 
-// Rendering stuff
+// Used to do collision detection
 Matrix = function (rows, columns) {
   var i, j;
   this.data = new Array(rows);
@@ -397,6 +401,21 @@ Ship = function () {
 
   this.preMove = function (delta) {
     // TODO: Decide what to do next
+    
+    // Find a target
+    // TODO: target random ship? This one targets the oldest one
+    if(Game != null && targetShip == null || targetShip.visible == false) {
+      console.log("I have no target. Time to go find one " + Game.sprites.keys());
+      // Pick a new target
+      for(var shipKey in Game.sprites) {
+        console.log("considering " + Game.sprites[shipKey].name);
+        if(Game.sprites[shipKey].name == "enemyship") {
+          console.log("Targeting enemy: " + Game.sprites[shipKey]);
+          targetShip = Game.sprites[shipKey];
+        }
+      }
+    }
+    
     var nextMove = {
       left: false,
       right: false,
