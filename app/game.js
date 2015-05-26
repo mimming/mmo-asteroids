@@ -47,7 +47,7 @@ var STARTING_LIVES = 4;
 
 
 // UI constants
-var CANVAS_WIDTH = 1000;
+var CANVAS_WIDTH = 1280;
 var CANVAS_HEIGHT = 700;
 /**
  * The grid sized, used to speed up collision maths. 
@@ -116,6 +116,31 @@ function updateDisplayName(currentUser) {
 
 // Handle login UI
 $(document).ready(function() {
+  // Init the touchscreen controller
+  GameController.init( {
+    left: {
+      type: 'dpad'
+    },
+    right: {
+      position: {
+        right: '5%'
+      },
+      type: 'buttons',
+        buttons: [
+          {
+            label: 'shoot', fontSize: 13,
+              touchStart: function() {
+                GameController.simulateKeyEvent( 'press', 32 );
+                GameController.simulateKeyEvent( 'down', 32 );
+              },
+              touchEnd: function() {
+                GameController.simulateKeyEvent( 'up', 32 );
+              }
+          },
+          false, false, false
+        ]
+      }
+  });
   if(currentUser) {
     // Update the display name again, just in case the user auth'd before the elements were ready
     updateDisplayName(currentUser);
