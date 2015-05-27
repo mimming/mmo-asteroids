@@ -3,7 +3,7 @@ body {
   background: url('assets/bg_tile.jpg');
   margin-left: auto;
   margin-right: auto;
-  width: 1024px;
+  width: 1280px;
   font-size: 16px;
   color: #c0c0c0;
 }
@@ -131,4 +131,8 @@ A:hover {text-decoration: underline; color: white;}
   height:200px;
   bottom:0px;
   right:0px;
+}
+
+@media only screen and (max-width : 992px) {
+	#footer-pane{display:none;}
 }
