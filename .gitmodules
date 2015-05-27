@@ -1,0 +1,3 @@
+[submodule "app/assets/html5-virtual-game-controller"]
+	path = app/assets/html5-virtual-game-controller
+	url = https://github.com/austinhallock/html5-virtual-game-controller
