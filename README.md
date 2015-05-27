@@ -3,7 +3,8 @@
 Pure JavaScript Multiplayer Asteroids. Powered by [Firebase](https://firebase.com).
 
 [![Preview](preview.gif)](https://mmoasteroids.firebaseapp.com/)
-[Live Demo](https://mmoasteroids.firebaseapp.com/)
+
+[Play the live demo](https://mmoasteroids.firebaseapp.com/)
 
 Based on the [original version](https://github.com/dmcinnes/HTML5-Asteroids) by 
 [Doug McInnes](https://github.com/dmcinnes), we added some Firebase love and made it multiplayer! 
