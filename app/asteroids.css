@@ -147,6 +147,8 @@ button {
   -webkit-border-radius: 75px;
   border-radius: 75px;
   background: #b1afae;
+  font-size: 50px;
+  text-align: center;
 }
 
 #button-fire {
