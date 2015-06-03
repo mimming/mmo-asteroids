@@ -34,6 +34,13 @@ var KEY_CODES = {
   40: 'down',
   71: 'g'
 };
+var BUTTON_CODES = {
+  'dpad-left': 'left',
+  'dpad-right': 'right',
+  'button-go': 'up',
+  'button-fire': 'space'
+};
+
 
 // Gameplay constants
 var SHIP_MAX_SPEED = 8;
@@ -47,7 +54,7 @@ var STARTING_LIVES = 4;
 
 
 // UI constants
-var CANVAS_WIDTH = 1280;
+var CANVAS_WIDTH = 900;
 var CANVAS_HEIGHT = 700;
 /**
  * The grid sized, used to speed up collision maths. 
@@ -116,59 +123,6 @@ function updateDisplayName(currentUser) {
 
 // Handle login UI
 $(document).ready(function() {
-  // Init the touchscreen controller
-  if( 'ontouchstart' in window || 'onmsgesturechange' in window ) {
-    GameController.init( {
-      forcePerformanceFriendly: true,
-      left: {
-        type: 'dpad',
-        dpad: {
-          up: false,
-          down: false,
-          left: {
-            width: '20%',
-            height: '30%',
-            stroke:20,
-          },
-          right:{
-            width: '20%',
-            height: '30%',
-            stroke:20,
-          }
-        }
-      },
-      right: {
-        position: {
-          right: '10%'
-        },
-        type: 'buttons',
-          buttons: [
-            false,
-            {
-              label: 'Shoot', fontSize: 13,
-                touchStart: function() {
-                  GameController.simulateKeyEvent( 'press', 32 );
-                  GameController.simulateKeyEvent( 'down', 32 );
-                },
-                touchEnd: function() {
-                  GameController.simulateKeyEvent( 'up', 32 );
-                }
-            },
-            false,
-            {
-              label: 'Go', fontSize: 13,
-                touchStart: function() {
-                  GameController.simulateKeyEvent( 'press', 38 );
-                  GameController.simulateKeyEvent( 'down', 38 );
-                },
-                touchEnd: function() {
-                  GameController.simulateKeyEvent( 'up', 38 );
-                }
-            },
-          ]
-        }
-    });
-  }
   if(currentUser) {
     // Update the display name again, just in case the user auth'd before the elements were ready
     updateDisplayName(currentUser);
@@ -176,6 +130,12 @@ $(document).ready(function() {
 
   $("#login").click(function() {
     firebaseRef.authWithOAuthPopup("twitter", function(error, authData) {
+      if (error) {
+        console.log("Twitter login Failed!", error);
+      }
+    });
+  }).on("tap", function() {
+    firebaseRef.authWithOAuthRedirect("twitter", function (error, authData) {
       if (error) {
         console.log("Twitter login Failed!", error);
       }
@@ -203,6 +163,27 @@ $(window).keydown(function (event) {
     event.preventDefault();
     KEY_STATUS[KEY_CODES[event.keyCode]] = false;
   }
+});
+
+$(document).ready(function () {
+  function buttonDown(event) {
+    KEY_STATUS.keyDown = true;
+    if (BUTTON_CODES[event.target.id]) {
+      event.preventDefault();
+      KEY_STATUS[BUTTON_CODES[event.target.id]] = true;
+    }
+  }
+  function buttonUp(event) {
+    KEY_STATUS.keyDown = false;
+    if (BUTTON_CODES[event.target.id]) {
+      event.preventDefault();
+      KEY_STATUS[BUTTON_CODES[event.target.id]] = false;
+    }
+  }
+
+  $("#touch-controls button").on('mousedown', buttonDown).on('mouseup', buttonUp);
+  $("#touch-controls button").on('touchstart', buttonDown).on('touchend', buttonUp);
+
 });
 
 // Add player's ship to Firebase
@@ -1436,4 +1417,12 @@ $(function () {
       delete Game.sprites['bullet:' + snapshot.key()];
     }
   });
+});
+
+
+// Prevent scrolling on mobile
+$(document).on('touchstart', function(e) {
+  if (e.target.nodeName !== 'INPUT') {
+    e.preventDefault();
+  }
 });

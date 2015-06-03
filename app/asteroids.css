@@ -3,7 +3,7 @@ body {
   background: url('assets/bg_tile.jpg');
   margin-left: auto;
   margin-right: auto;
-  width: 1280px;
+  width: 900px;
   font-size: 16px;
   color: #c0c0c0;
 }
@@ -93,46 +93,72 @@ A:hover {text-decoration: underline; color: white;}
   border:1px solid black;
 }
 
-#left-controls {
-  position:absolute;
-  left:1px;
-  bottom:0;
-  display:none;
+/* for touch controls */
+button {
+  background: none;
+  border: 0;
 }
 
-#right-controls {
-  position:absolute;
-  right:1px;
-  bottom:0px;
-  display:none;
+#touch-controls {
+  margin: 20px;
+}
+#touch-dpad {
+  float: left;
+}
+#touch-dpad {
+  float: right;
+}
+#touch-controls button {
+  margin: 20px;
 }
 
-#up {
-  width:200px;
-  height:100px;
-  bottom:100px;
+.triangle-left {
+  width: 0;
+  height: 0;
+  border-top: 75px solid #000000;
+  border-right: 150px solid #b1afae;
+  border-bottom: 75px solid #000000;
+  font-size: 0;
+  line-height: 0;
+  padding: 0;
 }
 
-#left {
-  width:100px;
-  height:100px;
-  bottom:0px;
+.triangle-right {
+  width: 0;
+  height: 0;
+  border-top: 75px solid #000000;
+  border-left: 150px solid #b1afae;
+  border-bottom: 75px solid #000000;
+  font-size: 0;
+  line-height: 0;
+  padding: 0;
 }
 
-#right {
-  width:100px;
-  height:100px;
-  bottom:0px;
-  left:100px;
+.circle {
+  width: 150px;
+  height: 150px;
+  -moz-border-radius: 75px;
+  -webkit-border-radius: 75px;
+  border-radius: 75px;
+  background: #b1afae;
 }
 
-#space {
-  width:200px;
-  height:200px;
-  bottom:0px;
-  right:0px;
+#button-fire {
+  background: #e4372f;
 }
+#button-go {
+  background: #d7e950;
+}
+
+
 
 @media only screen and (max-width : 992px) {
-	#footer-pane{display:none;}
+  #footer-pane{display:none;}
+  #touch-controls{display:block;}
+  #login img { width: 300px;}
 }
+
+@media only screen and (min-width : 992px) {
+  #touch-controls{display:none;}
+}
+

@@ -8,7 +8,6 @@
   <script src="//cdn.firebase.com/js/client/2.0.6/firebase.js"></script>
   <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
   <script src="assets/vector_battle_regular.typeface.js"></script>
-  <script src="assets/html5-virtual-game-controller/gamecontroller.min.js"></script>
   <script src="anchor.js"></script>
   <script src="game.js"></script>
   <base target="_blank">
@@ -17,25 +16,27 @@
 <div id="asteroids">
   <div id="header-pane">
     <div id="header-left">
-      <span>Multiplayer Asteroids! &nbsp; &nbsp; </span>
-      <a href="https://twitter.com/share" class="twitter-share-button" data-url="https://mmoasteroids.firebaseapp.com/" data-text="Multiplayer Online Asteroids" data-via="MMOAsteroids" data-related="Firebase">Tweet</a><script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src="//platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+      <h1>Multiplayer Asteroids!</h1>
     </div>
     <div id="header-right">
       <span id="my-name"></span>: <span id="my-score"></span>
-      <span id="login"><a href="javascript:void(0);">Sign in with Twitter</a></span>
+      <span id="login"><a href="javascript:void(0);"><img src="assets/sign-in-with-twitter-gray.png"></a></span>
     </div>
   </div>
   <div id="game-pane">
     <div id="game-container">
-      <div id="left-controls">
-        <div id="up" class='button'>⬆</div>
-        <div id="left" class='button'>⬅</div>
-        <div id="right" class='button'>➡</div>
-      </div>
-      <div id="right-controls">
-        <div id="space" class='button'>Fire</div>
-      </div>
-      <canvas id="canvas" width="1280" height="700"></canvas>
+      <canvas id="canvas" width="900" height="700"></canvas>
+    </div>
+  </div>
+  <div id="touch-controls">
+
+    <div id="touch-dpad" style="float: left">
+      <button class="triangle-left" id="dpad-left"></button>
+      <button class="triangle-right" id="dpad-right"></button>
+    </div>
+    <div id="touch-buttons" style="float: right">
+      <button class="circle" id="button-fire">Fire</button>
+      <button class="circle" id="button-go">Go</button>
     </div>
   </div>
   <div id="footer-pane">
@@ -45,8 +46,7 @@
         <li>An actual MMO <a href="https://github.com/dmcinnes/HTML5-Asteroids">Asteroids</a> without the April Fools'
           joke! And, also, ehh.. without asteroids. You get the point.
         </li>
-        <li>Built on a Sunday afternoon using a <a href="https://www.firebase.com/">super awesome API</a>.</li>
-
+        <li>Originally built on a Sunday afternoon using a <a href="https://www.firebase.com/">super awesome API</a>.</li>
       </ul>
     </div>
     <div class="footer-col">
@@ -59,10 +59,10 @@
       <h3>Leaderboard</h3>
       <table id="leaderboardTable"></table>
     </div>
-    <div class="footer-col">
-      <h3>Powered By</h3>
-      <a href="https://www.firebase.com/"><img src="assets/firebase.png"></a><br>
-    </div>
+  </div>
+  <div class="sub-footer" style="clear: both; margin: 200px auto; width: 500px;">
+    <h3>Powered By</h3>
+    <a href="https://www.firebase.com/"><img src="assets/firebase.png"></a><br>
   </div>
 </div>
 </body>

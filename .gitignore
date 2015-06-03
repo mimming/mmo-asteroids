@@ -1,2 +1,6 @@
 **.DS_Store
 **.swp
+**.iml
+.idea
+bot/node_modules
+bot/npm-debug.log
