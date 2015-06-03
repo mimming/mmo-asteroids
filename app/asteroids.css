@@ -45,6 +45,7 @@ A:hover {text-decoration: underline; color: white;}
 
 #header-left {
   float: left;
+  margin-left: 20px;
 }
 
 .footer-col {
@@ -54,6 +55,7 @@ A:hover {text-decoration: underline; color: white;}
 
 #header-right {
   float: right;
+  margin: 25px 20px 25px;
 }
 
 #footer-pane {
@@ -91,6 +93,10 @@ A:hover {text-decoration: underline; color: white;}
 .button {
   position:absolute;
   border:1px solid black;
+}
+
+#login {
+  margin: 20px;
 }
 
 /* for touch controls */
@@ -150,15 +156,20 @@ button {
   background: #d7e950;
 }
 
-
-
 @media only screen and (max-width : 992px) {
-  #footer-pane{display:none;}
+  #controls-help, #leaderboard-container{display:none;}
+  #powered-by {
+    margin-left: 100px;
+  }
   #touch-controls{display:block;}
-  #login img { width: 300px;}
+  #login img { width: 200px;}
+  body {
+    font-size: 24px;
+  }
 }
 
 @media only screen and (min-width : 992px) {
   #touch-controls{display:none;}
 }
+
 
