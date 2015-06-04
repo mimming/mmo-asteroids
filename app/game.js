@@ -919,7 +919,7 @@ Explosion = function () {
   this.bridgesV = false;
 
   this.lines = [];
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 9; i++) {
     var rad = 2 * Math.PI * Math.random();
     var x = Math.cos(rad);
     var y = Math.sin(rad);
@@ -931,7 +931,7 @@ Explosion = function () {
       this.context.save();
       this.context.lineWidth = 1.0 / this.scale;
       this.context.beginPath();
-      for (var i = 0; i < 5; i++) {
+      for (var i = 0; i < 9; i++) {
         var line = this.lines[i];
         this.context.moveTo(line[0], line[1]);
         this.context.lineTo(line[2], line[3]);
@@ -946,7 +946,7 @@ Explosion = function () {
     if (this.visible) {
       this.scale += delta;
     }
-    if (this.scale > 8) {
+    if (this.scale > 15) {
       this.die();
     }
   };
@@ -1386,8 +1386,8 @@ $(function () {
       var enemy = Game.sprites[snapshot.key()];
       enemy.visible = false;
       delete Game.sprites[snapshot.key()];
-    }
-    else {
+      Game.explosionAt(snapshot.val().ship.x, snapshot.val().ship.y);
+    } else {
       Game.ship.collision(null);
     }
   });

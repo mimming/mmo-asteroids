@@ -547,7 +547,9 @@ Ship = function () {
       this.vel.y *= 0.95;
     }
 
-    // Write new ship location to Firebase on each key frame
+    // Write new ship location to Firebase when interesting this happen, or every 30 boring frames
+    this.keyFrame++;
+
     if ((this.vel.rot !== this.previousKeyFrame.vel.rot) || (nextMove.up !== this.previousKeyFrame.accb)) {
       myship.set({
         ship: {
@@ -560,24 +562,22 @@ Ship = function () {
         },
         user: currentUser
       });
+    } else {
+      if (this.keyFrame % 30 == 0) {
+        myship.set({
+          ship: {
+            acc: this.acc,
+            vel: this.vel,
+            x: this.x,
+            y: this.y,
+            rot: this.rot,
+            accb: nextMove.up
+          },
+          user: currentUser
+        });
+      }
     }
     this.previousKeyFrame = { vel: { rot: this.vel.rot }, accb: nextMove.up };
-
-    // Write new ship location to Firebase about every 60 frames
-    this.keyFrame++;
-    if (this.keyFrame % 30 == 0) {
-      myship.set({
-        ship: {
-          acc: this.acc,
-          vel: this.vel,
-          x: this.x,
-          y: this.y,
-          rot: this.rot,
-          accb: nextMove.up
-        },
-        user: currentUser
-      });
-    }
   };
 
   this.collision = function (other) {
