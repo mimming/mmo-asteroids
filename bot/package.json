@@ -21,7 +21,7 @@
     "firebase"
   ],
   "author": "Jennifer Tong, Vikrum Nijjar, Doug McInnes",
-  "license": "MIT",
+  "license": "Apache 2.0",
   "bugs": {
     "url": "https://github.com/mimming/mmo-asteroids/issues"
   },
