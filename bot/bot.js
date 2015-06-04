@@ -37,6 +37,9 @@ var BULLET_LIFETIME = 50;
 var CANVAS_WIDTH = 1000;
 var CANVAS_HEIGHT = 700;
 
+// bot types: derpy, hunter
+var botType = "derpy";
+
 /**
  * The grid sized, used to speed up collision maths.
  * Too small = missed collisions
@@ -374,6 +377,8 @@ Sprite = function () {
  * The player's ship
  */
 Ship = function () {
+  this.aiTimer = 0;
+
   this.init("ship",
       [-5, 4,
         0, -12,
@@ -399,30 +404,92 @@ Ship = function () {
 
   this.previousKeyFrame = { vel: { rot: 0 }, accb: false };
 
+  this.nextMove = {
+    left: false,
+    right: false,
+    up: false,
+    space: false
+  };
+
   this.preMove = function (delta) {
-    // TODO: Decide what to do next
-    
-    // Find a target
-    // TODO: target random ship? This one targets the oldest one
-    if(Game != null && targetShip == null || targetShip.visible == false) {
-      console.log("I have no target. Time to go find one " + Game.sprites.keys());
-      // Pick a new target
-      for(var shipKey in Game.sprites) {
-        console.log("considering " + Game.sprites[shipKey].name);
-        if(Game.sprites[shipKey].name == "enemyship") {
-          console.log("Targeting enemy: " + Game.sprites[shipKey]);
-          targetShip = Game.sprites[shipKey];
+    // AI decides what to do
+
+    if(botType == "hunter") {
+      // Find a target
+      // TODO: target random ship? This one targets the oldest one
+      if(Game != null && targetShip == null || targetShip.visible == false) {
+        console.log("I have no target. Time to go find one " + Game.sprites.keys());
+        // Pick a new target
+        for(var shipKey in Game.sprites) {
+          console.log("considering " + Game.sprites[shipKey].name);
+          if(Game.sprites[shipKey].name == "enemyship") {
+            console.log("Targeting enemy: " + Game.sprites[shipKey]);
+            targetShip = Game.sprites[shipKey];
+          }
+        }
+      }
+    } else if(botType == "derpy") {
+      // If it's been a second since last decision
+      if(Date.now() - this.aiTimer > 1200) {
+        this.aiTimer = Date.now();
+        var decision = Math.round(Math.random() * 4);
+        switch(decision) {
+          case 0:
+            console.log("turn right");
+            nextMove = {
+              left: false,
+              right: true,
+              up: false,
+              space: false
+            };
+            break;
+          case 1:
+            console.log("turn left, shoot");
+            nextMove = {
+              left: true,
+              right: false,
+              up: false,
+              space: true
+            };
+            break;
+          case 2:
+            console.log("turn right, shoot, engine");
+            nextMove = {
+              left: false,
+              right: true,
+              up: true,
+              space: true
+            };
+          case 3:
+            console.log("shoot stuff");
+            nextMove = {
+              left: false,
+              right: false,
+              up: false,
+              space: true
+            };
+            break;
+          case 4:
+            console.log("enable engine");
+            nextMove = {
+              left: false,
+              right: false,
+              up: true,
+              space: false
+            };
+            break;
+          default:
+            // do nothing
+            nextMove = {
+              left: false,
+              right: false,
+              up: false,
+              space: false
+            };
         }
       }
     }
-    
-    var nextMove = {
-      left: false,
-      right: false,
-      up: true,
-      space: false
-    };
-    
+
     if (nextMove.left) {
       this.vel.rot = -SHIP_ROTATION_RATE;
     } else if (nextMove.right) {
@@ -498,7 +565,7 @@ Ship = function () {
 
     // Write new ship location to Firebase about every 60 frames
     this.keyFrame++;
-    if (this.keyFrame % 60 == 0) {
+    if (this.keyFrame % 30 == 0) {
       myship.set({
         ship: {
           acc: this.acc,
@@ -756,7 +823,6 @@ Game = {
   // Finite state machine of game progression
   FSM: {
     boot: function () {
-//      KEY_STATUS.space = false; // hack so we don't shoot right away
       this.state = 'start';
     },
     start: function () {
