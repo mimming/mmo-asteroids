@@ -692,8 +692,7 @@ Ship = function () {
   this.collision = function (other) {
     if(other != null) {
       Game.explosionAt(other.x, other.y);
-    }
-    else {
+    } else {
       Game.explosionAt(Game.ship.x, Game.ship.y);
     }
     Game.FSM.state = 'player_died';
@@ -946,8 +945,9 @@ Explosion = function () {
     if (this.visible) {
       this.scale += delta;
     }
+
     if (this.scale > 15) {
-      this.die();
+        this.die();
     }
   };
 };
