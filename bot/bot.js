@@ -37,9 +37,6 @@ var BULLET_LIFETIME = 50;
 var CANVAS_WIDTH = 1000;
 var CANVAS_HEIGHT = 700;
 
-// bot types: derpy, hunter
-var botType = "derpy";
-
 /**
  * The grid sized, used to speed up collision maths.
  * Too small = missed collisions
@@ -392,7 +389,7 @@ Ship = function () {
         0, 11,
         3, 6]);
 
-  
+
   this.visible = true;
   this.bulletCounter = 0;
   this.strokeStyle = "#ffff00";
@@ -414,81 +411,66 @@ Ship = function () {
   this.preMove = function (delta) {
     // AI decides what to do
 
-    if(botType == "hunter") {
-      // Find a target
-      // TODO: target random ship? This one targets the oldest one
-      if(Game != null && targetShip == null || targetShip.visible == false) {
-        console.log("I have no target. Time to go find one " + Game.sprites.keys());
-        // Pick a new target
-        for(var shipKey in Game.sprites) {
-          console.log("considering " + Game.sprites[shipKey].name);
-          if(Game.sprites[shipKey].name == "enemyship") {
-            console.log("Targeting enemy: " + Game.sprites[shipKey]);
-            targetShip = Game.sprites[shipKey];
-          }
-        }
-      }
-    } else if(botType == "derpy") {
-      // If it's been a second since last decision
-      if(Date.now() - this.aiTimer > 1200) {
-        this.aiTimer = Date.now();
-        var decision = Math.round(Math.random() * 4);
-        switch(decision) {
-          case 0:
-            console.log("turn right");
-            nextMove = {
-              left: false,
-              right: true,
-              up: false,
-              space: false
-            };
-            break;
-          case 1:
-            console.log("turn left, shoot");
-            nextMove = {
-              left: true,
-              right: false,
-              up: false,
-              space: true
-            };
-            break;
-          case 2:
-            console.log("turn right, shoot, engine");
-            nextMove = {
-              left: false,
-              right: true,
-              up: true,
-              space: true
-            };
-          case 3:
-            console.log("shoot stuff");
-            nextMove = {
-              left: false,
-              right: false,
-              up: false,
-              space: true
-            };
-            break;
-          case 4:
-            console.log("enable engine");
-            nextMove = {
-              left: false,
-              right: false,
-              up: true,
-              space: false
-            };
-            break;
-          default:
-            // do nothing
-            nextMove = {
-              left: false,
-              right: false,
-              up: false,
-              space: false
-            };
-        }
+    // If it's been awhile since the last decision
+    if(Date.now() - this.aiTimer > 1200) {
+      this.aiTimer = Date.now();
+      var decision = Math.round(Math.random() * 4);
+      switch(decision) {
+        case 0:
+          console.log("turn right");
+          nextMove = {
+            left: false,
+            right: true,
+            up: false,
+            space: false
+          };
+          break;
+        case 1:
+          console.log("turn left, shoot");
+          nextMove = {
+            left: true,
+            right: false,
+            up: false,
+            space: true
+          };
+          break;
+        case 2:
+          console.log("turn right, shoot, engine");
+          nextMove = {
+            left: false,
+            right: true,
+            up: true,
+            space: true
+          };
+        case 3:
+          console.log("shoot stuff");
+          nextMove = {
+            left: false,
+            right: false,
+            up: false,
+            space: true
+          };
+          break;
+        case 4:
+          console.log("enable engine");
+          nextMove = {
+            left: false,
+            right: false,
+            up: true,
+            space: false
+          };
+          break;
+        default:
+          // do nothing
+          nextMove = {
+            left: false,
+            right: false,
+            up: false,
+            space: false
+          };
       }
     }
+
 
     if (nextMove.left) {
       this.vel.rot = -SHIP_ROTATION_RATE;
