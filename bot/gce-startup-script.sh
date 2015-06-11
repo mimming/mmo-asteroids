@@ -9,8 +9,8 @@ export PATH=$PATH:/opt/bitnami/nodejs/bin:/opt/bitnami/git/bin
 npm install -g forever
 
 # start the bot
-pushd /usr/local
+cd /usr/local
 git clone https://github.com/mimming/mmo-asteroids
-pushd mmo-asteroids/bot
+cd mmo-asteroids/bot
 npm install
 forever start /usr/local/mmo-asteroids/bot/bot.js
