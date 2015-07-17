@@ -22,6 +22,10 @@
 
 console.log("Hello! I'm the asteroids bot. I'm going to spawn someone for you to play against.");
 
+process.on('SIGINT', function() {
+  process.exit();
+});
+
 var Firebase = require("firebase");
 // Constants
 
@@ -833,6 +837,11 @@ Game = {
     run: function () {
     },
     player_died: function () {
+
+
+      if (process.env.EXIT_WHEN_DEAD) {
+        process.exit();
+      }
 
       if (this.timer == null) {
         this.timer = Date.now();
