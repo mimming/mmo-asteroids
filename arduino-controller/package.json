@@ -1,0 +1,31 @@
+{
+  "name": "mmo-asteroids-bot",
+  "version": "1.0.0",
+  "description": "A bot server for https://mmoasteroids.firebaseapp.com",
+  "main": "bot.js",
+  "dependencies": {
+    "firebase": "^2.2.5",
+    "johnny-five": "^0.8.97",
+    "raspi-io": "^4.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mimming/mmo-asteroids.git"
+  },
+  "keywords": [
+    "game",
+    "asteroids",
+    "multiplayer",
+    "firebase"
+  ],
+  "author": "Jennifer Tong, Vikrum Nijjar, Doug McInnes",
+  "license": “MIT”,
+  "bugs": {
+    "url": "https://github.com/mimming/mmo-asteroids/issues"
+  },
+  "homepage": "https://github.com/mimming/mmo-asteroids"
+}
